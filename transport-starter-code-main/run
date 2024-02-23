@@ -145,6 +145,7 @@ class Wrapper:
       return []
 
   def read(self, fd):
+    # print(fd.parent, fd.fd)
     if fd.fd == self.socket:
       data, addr = fd.fd.recvfrom(65535)
       if not self.remote_port:
@@ -162,7 +163,7 @@ class Wrapper:
         
       if self.executable != RECEVIER_EXECUTABLE_NAME or fd.fd != self.process.stdout:
         for line in data.decode('utf-8').strip().split("\n"):
-          log(self.executable, (" " * 50 if self.executable == "3700recv" else "" ) + line)
+          log(self.executable, (" " * 50 if self.executable == "4700recv" else "" ) + line)
           m = re.match(r'Bound to port ([0-9]+)', line)
           if m:
             self.remote_port = int(m.group(1))
@@ -334,7 +335,10 @@ class Simulator:
   def start(self):
     log("Simulator", "Beginning simulation")
     self.receiver.start()
+    print(self.receiver.port)
     self.sender.start()
+    print(self.sender.port)
+    # print(self.sender.remote_port == None)
 
     while True:
       read_fds = self.receiver.get_read_fds() + self.sender.get_read_fds()
