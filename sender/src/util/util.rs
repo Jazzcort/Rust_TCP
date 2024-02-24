@@ -6,3 +6,13 @@ pub fn read_to_string(buf: &[u8]) -> String {
     }
     String::from_utf8_lossy(&buf).to_string()
 }
+
+pub fn safe_increment(cur_seq: u32, add_bytes: u32) -> u32 {
+    let dst_to_wrap = u32::MAX - cur_seq;
+
+    if dst_to_wrap < add_bytes {
+        add_bytes - dst_to_wrap
+    } else {
+        cur_seq + add_bytes
+    }
+}

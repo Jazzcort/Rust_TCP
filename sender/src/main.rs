@@ -6,6 +6,9 @@ use clap::Parser;
 use std::net::UdpSocket;
 use std::thread::{JoinHandle, spawn};
 use util::tcp_header::TcpHeader;
+use util::util::*;
+
+
 
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None)]
@@ -42,14 +45,14 @@ struct Cli {
 //     }
 // }
 
-fn read_to_string(buf: &[u8]) -> String {
-    for ind in 0..buf.len() {
-        if buf[ind] == 0 {
-            return String::from_utf8_lossy(&buf[..ind]).to_string();
-        }
-    }
-    String::from_utf8_lossy(&buf).to_string()
-}
+// fn read_to_string(buf: &[u8]) -> String {
+//     for ind in 0..buf.len() {
+//         if buf[ind] == 0 {
+//             return String::from_utf8_lossy(&buf[..ind]).to_string();
+//         }
+//     }
+//     String::from_utf8_lossy(&buf).to_string()
+// }
 
 fn main() -> Result<(), String> {
     let cli = Cli::parse();
