@@ -28,7 +28,7 @@ fn main() {
     ];
 
     let tcp_header = TcpHeader::new(&header_bytes);
-    println!("{:?}", tcp_header);
+    eprintln!("{:?}", tcp_header);
 
     // let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
     // eprintln!("Bound to port {}", socket.local_addr().unwrap().port());

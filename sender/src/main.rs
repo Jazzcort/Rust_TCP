@@ -1,8 +1,11 @@
+mod util;
+mod tcp_sender;
 use std::any::TypeId;
 use std::io::{self, BufRead, Stdin, StdinLock};
 use clap::Parser;
 use std::net::UdpSocket;
 use std::thread::{JoinHandle, spawn};
+use util::tcp_header::TcpHeader;
 
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None)]
@@ -75,6 +78,21 @@ fn main() -> Result<(), String> {
     //     }
     // }
 
+    let header_bytes: [u8; 16] = [
+        0x00, 0x50, // Source port (80)
+        0x01, 0xBB, // Destination port (443)
+        0x00, 0x00, 0x00, 0x01, // Sequence number
+        0x00, 0x00, 0x00, 0x00, // Acknowledgment number
+        0x50, // Header length (5) and Reserved (0), here for simplicity
+        0b0011_1111, // Flags (URG, ACK, PSH, RST, SYN, FIN)
+        0x00, 0x00, // Window size (just an example)
+    ];
+
+    let tcp_header = TcpHeader::new(&header_bytes);
+    dbg!(&tcp_header);
+    let copy_header = TcpHeader::new(tcp_header.as_bytes().as_slice());
+    dbg!(&copy_header);
+
 
     // Ok(())
     let data_len = handle.read_line(&mut buffer).map_err(|e| format!("{e} -> failed to read"))?;
@@ -89,24 +107,24 @@ fn main() -> Result<(), String> {
         socket.send_to(text.as_bytes() , format!("{}:{}", cli.recv_host.clone(), cli.recv_port.clone())).unwrap();
     }
 
-    socket.send_to("jazzcort".as_bytes(), format!("{}:{}", cli.recv_host.clone(), cli.recv_port.clone())).unwrap();
+    // socket.send_to("jazzcort".as_bytes(), format!("{}:{}", cli.recv_host.clone(), cli.recv_port.clone())).unwrap();
 
     let mut buf: [u8; 1500] = [0; 1500];
-    loop {
-        match socket.recv(&mut buf) {
-            Ok(_) => {
-                let ack = read_to_string(&buf);
-                buf.fill(0);
-                let ind = ack.parse::<usize>().unwrap();
-                acks[ind] = 1;
+    // loop {
+    //     match socket.recv(&mut buf) {
+    //         Ok(_) => {
+    //             let ack = read_to_string(&buf);
+    //             buf.fill(0);
+    //             let ind = ack.parse::<usize>().unwrap();
+    //             acks[ind] = 1;
 
-                if acks.iter().sum::<usize>() == acks.len() {
-                    break;
-                }
-            }
-            Err(_) => {}
-        }
-    }
+    //             if acks.iter().sum::<usize>() == acks.len() {
+    //                 break;
+    //             }
+    //         }
+    //         Err(_) => {}
+    //     }
+    // }
 
 
 
