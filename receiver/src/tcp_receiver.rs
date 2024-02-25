@@ -1,12 +1,12 @@
 use rand::prelude::*;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::{self, BufRead};
 use std::net::UdpSocket;
-use std::time::Instant;
 use std::time::Duration;
+use std::time::Instant;
 
-use crate::{read_to_string, safe_increment};
 use crate::util::tcp_header::TcpHeader;
+use crate::{read_to_string, safe_increment};
 
 #[derive(Debug)]
 enum Status {
@@ -23,7 +23,7 @@ struct Packet {
     seq_num: u32,
     ack_num: u32,
     confirm_ack: u32,
-    data_len: u16
+    data_len: u16,
 }
 
 #[derive(Debug)]
@@ -44,7 +44,8 @@ pub struct Receiver {
     wnd_size: u16,
     cur_wnd: u16,
     file: String,
-    cur_buf: u16
+    cur_buf: u16,
+    cache: HashMap<u32, String>,
 }
 
 impl Receiver {
@@ -52,9 +53,14 @@ impl Receiver {
         let mut rng = rand::thread_rng();
         let seq_num: u32 = rng.gen();
 
-        let socket = UdpSocket::bind(format!("{}:{}", local_host, 0)).map_err(|e| format!("{} -> Failed to bind to {}:{}", e, local_host, 0))?;
-        let local = socket.local_addr().map_err(|e| format!("{e} -> Failed to get local port"))?;
-        socket.set_nonblocking(true).map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
+        let socket = UdpSocket::bind(format!("{}:{}", local_host, 0))
+            .map_err(|e| format!("{} -> Failed to bind to {}:{}", e, local_host, 0))?;
+        let local = socket
+            .local_addr()
+            .map_err(|e| format!("{e} -> Failed to get local port"))?;
+        socket
+            .set_nonblocking(true)
+            .map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
 
         Ok(Receiver {
             remote_host: "".to_string(),
@@ -73,7 +79,8 @@ impl Receiver {
             wnd_size: 7000,
             cur_wnd: 7000,
             file: String::new(),
-            cur_buf: 0
+            cur_buf: 0,
+            cache: HashMap::new(),
         })
     }
 
@@ -81,10 +88,10 @@ impl Receiver {
         loop {
             match self.status {
                 Status::StandBy => {
-                    let mut buf: [u8; 1500] = [0;1500];
+                    let mut buf: [u8; 1500] = [0; 1500];
                     loop {
-                        match self.socket.recv(&mut buf) {
-                            Ok(_) => {
+                        match self.socket.recv_from(&mut buf) {
+                            Ok((_, addr)) => {
                                 let header = TcpHeader::new(&buf[..16]);
                                 if header.destination_port != self.local_port {
                                     continue;
@@ -94,69 +101,11 @@ impl Receiver {
                                     continue;
                                 }
 
-                                self.cur_wnd = self.wnd_size.min(header.window_size);
-                                // let fragment = read_to_string(&buf[16..]);
-                                // self.
+                                let a: Vec<&str> = addr.to_string().split(":").map(|x| x).collect();
 
-
-
-
-
-                                buf.fill(0);
-                                
-                            }
-                            Err(_) => {}
-                        }
-                    }
-                    
-                    
-                    self.status = Status::Handshake;
-                }
-                Status::Handshake => {
-                    let header = TcpHeader {
-                        source_port: self.local_port,
-                        destination_port: self.remote_port,
-                        sequence_number: self.seq_num,
-                        ack_number: self.ack_num,
-                        header_length: 4,
-                        flags: 0b0000_0010,
-                        window_size: self.wnd_size
-                    };
-                    // self.socket.send_to(&header.as_bytes(), format!("{}:{}", self.remote_host, self.remote_port)).map_err(|e| format!("{e} -> Failed to send SYN packet"))?;
-                    // self.expect_ack.push_back(safe_increment(self.seq_num, 1));
-
-                    self.register_packet(header, "");
-
-                    dbg!(&self.seq_num);
-                    
-
-                    let mut buf: [u8; 1500] = [0;1500];
-                    loop {
-                        
-                        match self.socket.recv(&mut buf) {
-                            Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
-                                buf.fill(0);
-
-                                if header.ack_number != self.in_flight[0].confirm_ack {
-                                    continue;
-                                }
-
-                                if header.flags != 18 {
-                                    continue;
-                                }
-
-                                if header.source_port != self.remote_port {
-                                    continue;
-                                }
-
-                                if header.destination_port != self.local_port {
-                                    continue;
-                                }
-
-                                self.cur_wnd = self.wnd_size.min(header.window_size);
-                                self.in_flight.pop_front();
-                                self.ack_num += 1;
+                                self.remote_host = a[0].to_string();
+                                self.remote_port = a[1].to_string().parse::<u16>().unwrap();
+                                self.ack_num = safe_increment(header.sequence_number, 1);
 
                                 let header = TcpHeader {
                                     source_port: self.local_port,
@@ -164,34 +113,34 @@ impl Receiver {
                                     sequence_number: self.seq_num,
                                     ack_number: self.ack_num,
                                     header_length: 4,
-                                    flags: 0b0001_0000,
-                                    window_size: self.wnd_size
+                                    flags: 0b0001_0010,
+                                    window_size: self.wnd_size,
                                 };
 
-                                dbg!(&self.seq_num);
-
                                 self.register_packet(header, "");
-                                self.status = Status::Sending;
+                                buf.fill(0);
                                 break;
                             }
                             Err(_) => {}
                         }
-
-                        self.check_retransmission();
-
                     }
-                    
+
+                    self.status = Status::Handshake;
                 }
-                Status::Sending => {
-                    while !self.in_flight.is_empty() {
+                Status::Handshake => {
+                    let mut buf: [u8; 1500] = [0; 1500];
+                    loop {
                         self.check_retransmission();
 
-                        let mut buf: [u8; 1500] = [0;1500];
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..16]);
 
-                                if header.flags != 8 {
+                                if header.ack_number != self.in_flight[0].confirm_ack {
+                                    continue;
+                                }
+
+                                if header.flags != 16 {
                                     continue;
                                 }
 
@@ -203,7 +152,53 @@ impl Receiver {
                                     continue;
                                 }
 
-                                self.cur_wnd = self.wnd_size.min(header.window_size);
+                                self.in_flight.pop_front();
+                                self.ack_num = safe_increment(self.ack_num, 1);
+                                let header = TcpHeader {
+                                    source_port: self.local_port,
+                                    destination_port: self.remote_port,
+                                    sequence_number: self.seq_num,
+                                    ack_number: self.ack_num,
+                                    header_length: 4,
+                                    flags: 0b0001_0000,
+                                    window_size: self.wnd_size,
+                                };
+
+                                self.register_packet(header, "");
+                                self.status = Status::Sending;
+
+                                buf.fill(0);
+                                break;
+                            }
+                            Err(_) => {}
+                        }
+                    }
+
+                    self.status = Status::Sending;
+                }
+                Status::Sending => {
+                    loop {
+                        self.check_retransmission();
+
+                        let mut buf: [u8; 1500] = [0; 1500];
+                        match self.socket.recv(&mut buf) {
+                            Ok(_) => {
+                                let header = TcpHeader::new(&buf[..16]);
+
+                                if header.flags != 24 || header.flags != 16 {
+                                    continue;
+                                }
+
+                                if header.source_port != self.remote_port {
+                                    continue;
+                                }
+
+                                if header.destination_port != self.local_port {
+                                    continue;
+                                }
+
+                                // ToDo: push data and implement cache
+
 
                                 match Self::find_packet_index(&self.in_flight, header.ack_number) {
                                     Ok(ind) => {
@@ -223,7 +218,9 @@ impl Receiver {
                         }
 
                         // Send data if there is enough space in sliding window
-                        while !self.data.is_empty() && (self.cur_wnd - self.cur_buf) as usize  > self.data[0].len() {
+                        while !self.data.is_empty()
+                            && (self.cur_wnd - self.cur_buf) as usize > self.data[0].len()
+                        {
                             let packet_data = self.data.pop_front().unwrap();
                             let header = TcpHeader {
                                 source_port: self.local_port,
@@ -232,7 +229,7 @@ impl Receiver {
                                 ack_number: self.ack_num,
                                 header_length: 4,
                                 flags: 0b0000_1000,
-                                window_size: self.wnd_size
+                                window_size: self.wnd_size,
                             };
 
                             self.register_packet(header, &packet_data);
@@ -256,6 +253,10 @@ impl Receiver {
             }
         }
         Err(())
+    }
+
+    fn register_cache(&mut self, ack_num: u32, data: String) {
+        self.cache.insert(ack_num, data);
     }
 
     fn register_packet(&mut self, header: TcpHeader, data: &str) {
@@ -282,13 +283,18 @@ impl Receiver {
             data: packet_data.clone(),
             seq_num,
             ack_num,
-            confirm_ack: safe_increment(seq_num,data_len as u32),
-            data_len
+            confirm_ack: safe_increment(seq_num, data_len as u32),
+            data_len,
         };
 
         self.in_flight.push_back(packet);
 
-        Self::send_data(&self.remote_host, &self.remote_port, packet_data.as_slice(), &self.socket);
+        Self::send_data(
+            &self.remote_host,
+            &self.remote_port,
+            packet_data.as_slice(),
+            &self.socket,
+        );
 
         self.seq_num = safe_increment(seq_num, data_len as u32);
     }
@@ -299,7 +305,12 @@ impl Receiver {
             let duration = instant.duration_since(packet.timestamp.clone());
 
             if duration >= Duration::from_millis(self.rto) {
-                Self::send_data(&self.remote_host, &self.remote_port, packet.data.as_slice(), &self.socket);
+                Self::send_data(
+                    &self.remote_host,
+                    &self.remote_port,
+                    packet.data.as_slice(),
+                    &self.socket,
+                );
                 packet.timestamp = Instant::now();
             } else {
                 return;
@@ -307,12 +318,15 @@ impl Receiver {
         }
     }
 
-    fn send_data(remote_host: &str, remote_port: &u16 , packet_data: &[u8], socket: &UdpSocket) {
-
+    fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
             match socket.send_to(packet_data, format!("{}:{}", remote_host, remote_port)) {
-                Ok(_) => {break;}
-                Err(e) => {eprintln!("{} -> Failed to send packet at registration", e)}
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("{} -> Failed to send packet at registration", e)
+                }
             }
         }
     }

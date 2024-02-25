@@ -172,7 +172,7 @@ impl Sender {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..16]);
 
-                                if header.flags != 8 {
+                                if header.flags != 16 {
                                     continue;
                                 }
 
@@ -212,7 +212,7 @@ impl Sender {
                                 sequence_number: self.seq_num,
                                 ack_number: self.ack_num,
                                 header_length: 4,
-                                flags: 0b0000_1000,
+                                flags: 0b0001_1000,
                                 window_size: self.wnd_size
                             };
 
@@ -282,8 +282,6 @@ impl Sender {
             if duration >= Duration::from_millis(self.rto) {
                 Self::send_data(&self.remote_host, &self.remote_port, packet.data.as_slice(), &self.socket);
                 packet.timestamp = Instant::now();
-            } else {
-                return;
             }
         }
     }
