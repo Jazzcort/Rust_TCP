@@ -1,7 +1,7 @@
 
 
 // TCP header struct
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TcpHeader {
     source_port: u16,
     destination_port: u16,

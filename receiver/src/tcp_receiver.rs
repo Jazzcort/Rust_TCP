@@ -1,9 +1,7 @@
 use rand::prelude::*;
 use std::collections::VecDeque;
-use std::fmt::format;
-use std::io::{self, BufRead, Stdin, StdinLock};
+use std::io::{self, BufRead};
 use std::net::UdpSocket;
-use std::collections::HashMap;
 use std::time::Instant;
 use std::time::Duration;
 
@@ -29,7 +27,7 @@ struct Packet {
 }
 
 #[derive(Debug)]
-pub struct Sender {
+pub struct Receiver {
     remote_host: String,
     remote_port: u16,
     local_host: String,
@@ -39,7 +37,6 @@ pub struct Sender {
     ack_num: u32,
     expect_seq: VecDeque<u32>,
     expect_ack: VecDeque<u32>,
-    data: VecDeque<String>,
     init_seq: u32,
     socket: UdpSocket,
     rto: u64,
@@ -50,8 +47,8 @@ pub struct Sender {
     cur_buf: u16
 }
 
-impl Sender {
-    pub fn new(remote_host: String, remote_port: u16, local_host: String) -> Result<Self, String> {
+impl Receiver {
+    pub fn new(local_host: String) -> Result<Self, String> {
         let mut rng = rand::thread_rng();
         let seq_num: u32 = rng.gen();
 
@@ -59,9 +56,9 @@ impl Sender {
         let local = socket.local_addr().map_err(|e| format!("{e} -> Failed to get local port"))?;
         socket.set_nonblocking(true).map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
 
-        Ok(Sender {
-            remote_host,
-            remote_port,
+        Ok(Receiver {
+            remote_host: "".to_string(),
+            remote_port: 0,
             local_host,
             local_port: local.port(),
             status: Status::StandBy,
@@ -70,7 +67,6 @@ impl Sender {
             ack_num: 0,
             expect_seq: VecDeque::new(),
             expect_ack: VecDeque::new(),
-            data: VecDeque::new(),
             socket,
             rto: 1000,
             in_flight: VecDeque::new(),
@@ -85,12 +81,35 @@ impl Sender {
         loop {
             match self.status {
                 Status::StandBy => {
-                    let mut buffer = String::new();
-                    let stdin = io::stdin();
-                    let mut handle = stdin.lock();
-                    handle.read_line(&mut buffer).map_err(|e| format!("{e} -> Failed to read stdin"))?;
+                    let mut buf: [u8; 1500] = [0;1500];
+                    loop {
+                        match self.socket.recv(&mut buf) {
+                            Ok(_) => {
+                                let header = TcpHeader::new(&buf[..16]);
+                                if header.destination_port != self.local_port {
+                                    continue;
+                                }
 
-                    self.data = buffer.as_bytes().chunks(1460).map(| ch| String::from_utf8_lossy(ch).to_string()).collect();
+                                if header.flags != 2 {
+                                    continue;
+                                }
+
+                                self.cur_wnd = self.wnd_size.min(header.window_size);
+                                // let fragment = read_to_string(&buf[16..]);
+                                // self.
+
+
+
+
+
+                                buf.fill(0);
+                                
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                    
+                    
                     self.status = Status::Handshake;
                 }
                 Status::Handshake => {
@@ -137,7 +156,7 @@ impl Sender {
 
                                 self.cur_wnd = self.wnd_size.min(header.window_size);
                                 self.in_flight.pop_front();
-                                self.ack_num = safe_increment(header.sequence_number, 1);
+                                self.ack_num += 1;
 
                                 let header = TcpHeader {
                                     source_port: self.local_port,
@@ -196,7 +215,7 @@ impl Sender {
                                 }
 
                                 let fragment = read_to_string(&buf[16..]);
-                                self.ack_num = safe_increment(self.ack_num, fragment.len() as u32);
+                                self.ack_num += fragment.len() as u32;
 
                                 buf.fill(0);
                             }
