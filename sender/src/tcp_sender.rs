@@ -336,8 +336,8 @@ impl Sender {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 10 {
             self.rtt = 10;
-        } else if self.rtt > 500 {
-            self.rtt = 500;
+        } else if self.rtt > 300 {
+            self.rtt = 300;
         }
         self.rto = self.rtt * 2;
     }
@@ -411,7 +411,8 @@ impl Sender {
                 );
                 packet.timestamp = Instant::now();
                 eprintln!(
-                    "resent: {}, since last sent: {}, ret: {}",
+                    "#{} resent: {}, since last sent: {}, ret: {}",
+                    num,
                     packet.confirm_ack,
                     duration.as_millis(),
                     self.rto
