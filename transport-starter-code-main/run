@@ -145,7 +145,6 @@ class Wrapper:
       return []
 
   def read(self, fd):
-    # print(fd.parent, fd.fd)
     if fd.fd == self.socket:
       data, addr = fd.fd.recvfrom(65535)
       if not self.remote_port:
@@ -335,10 +334,7 @@ class Simulator:
   def start(self):
     log("Simulator", "Beginning simulation")
     self.receiver.start()
-    print(self.receiver.port)
     self.sender.start()
-    print(self.sender.port)
-    # print(self.sender.remote_port == None)
 
     while True:
       read_fds = self.receiver.get_read_fds() + self.sender.get_read_fds()

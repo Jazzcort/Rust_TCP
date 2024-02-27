@@ -26,8 +26,6 @@ fn main() -> Result<(), String> {
 
     let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string()).unwrap();
 
-    dbg!(&sender);
-
     sender.start();
 
 
