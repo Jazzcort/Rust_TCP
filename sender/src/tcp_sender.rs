@@ -187,7 +187,6 @@ impl Sender {
                 }
                 Status::Sending => {
                     eprintln!("Sending");
-                    let mut prev_time = Instant::now();
                     while !self.in_flight.is_empty() || !self.data.is_empty() {
                         self.check_retransmission();
 
@@ -213,8 +212,10 @@ impl Sender {
                                 // self.cur_wnd = self.wnd_size.min(header.window_size);
 
                                 if header.ack_number == self.pre_ack {
+                                
                                     self.count += 1;
                                     if self.count >= 3 {
+                                        Self::send_data(&self.remote_host, &self.remote_port, self.in_flight[0].data.as_slice(), &self.socket);
                                         self.cwnd = self.cwnd / 2;
                                         self.count = 0;
                                     }
@@ -226,17 +227,10 @@ impl Sender {
                                     } else {
                                         self.cwnd = self.cwnd << 1;
                                     }
-
-                                    // Calculate RTT
-                                    let cur_time = Instant::now();
-                                    let rtt = cur_time.duration_since(prev_time).as_millis();
-                                    eprintln!("rtt: {}ms", rtt);
-                                    self.update_rto(rtt);
-                                    prev_time = cur_time;
                                 }
 
-                                if self.cwnd >= 32 {
-                                    self.cwnd = 32;
+                                if self.cwnd >= 42 {
+                                    self.cwnd = 42;
                                 } else if self.cwnd < 2 {
                                     self.cwnd = 2;
                                 }
@@ -251,12 +245,20 @@ impl Sender {
 
                                 match Self::find_packet_index(&self.in_flight, header.ack_number) {
                                     Ok(ind) => {
-                                        for _ in 0..=ind {
+                                        for i in 0..=ind {
                                             let packet = self.in_flight.pop_front().unwrap();
                                             self.cur_buf -= packet.data_len;
+
+                                            // Calculate RTT
+                                            if i == ind {
+                                                let cur_time = Instant::now();
+                                                let rtt = cur_time.duration_since(packet.timestamp).as_millis();
+                                                eprintln!("rtt: {}ms", rtt);
+                                                self.update_rto(rtt);
+                                            }
                                         }
 
-                                        self.pre_ack = header.ack_number
+                                        self.pre_ack = header.ack_number;
                                     }
                                     Err(_) => {}
                                 }
@@ -334,10 +336,10 @@ impl Sender {
 
     fn update_rto(&mut self, rtt: u128) {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
-        if self.rtt < 10 {
-            self.rtt = 10;
-        } else if self.rtt > 300 {
-            self.rtt = 300;
+        if self.rtt < 5 {
+            self.rtt = 5;
+        } else if self.rtt > 900 {
+            self.rtt = 900;
         }
         self.rto = self.rtt * 2;
     }
