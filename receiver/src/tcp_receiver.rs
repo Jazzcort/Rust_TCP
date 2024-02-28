@@ -118,19 +118,6 @@ impl Receiver {
 
                                 self.send_ack("1", 0b0001_0010);
 
-                                
-
-                                // let header = TcpHeader {
-                                //     source_port: self.local_port,
-                                //     destination_port: self.remote_port,
-                                //     sequence_number: self.seq_num,
-                                //     ack_number: self.ack_num,
-                                //     header_length: 4,
-                                //     flags: 0b0001_0010,
-                                //     window_size: self.wnd_size,
-                                // };
-
-                                // self.register_packet(header, "");
                                 buf.fill(0);
                                 break;
                             }
@@ -169,19 +156,6 @@ impl Receiver {
                                 // self.in_flight.pop_front();
                                 
                                 self.send_ack("1", 0b0001_0000);
-
-                                // self.ack_num = safe_increment(self.ack_num, 1);
-                                // let header = TcpHeader {
-                                //     source_port: self.local_port,
-                                //     destination_port: self.remote_port,
-                                //     sequence_number: self.seq_num,
-                                //     ack_number: self.ack_num,
-                                //     header_length: 4,
-                                //     flags: 0b0001_0000,
-                                //     window_size: self.wnd_size,
-                                // };
-
-                                // self.register_packet(header, "");
                                 self.status = Status::Sending;
 
                                 buf.fill(0);
@@ -196,16 +170,11 @@ impl Receiver {
                 Status::Sending => {
                     eprintln!("Sending");
                     loop {
-                        // self.check_retransmission();
 
                         let mut buf: [u8; 1500] = [0; 1500];
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..16]);
-
-                                // dbg!(&header, self.ack_num);
-                                // dbg!(self.local_port, self.remote_port);
-                                // dbg!(header.sequence_number == self.ack_num);
 
                                 if header.flags != 24 && header.flags != 16 && header.flags != 1 {
                                     continue;
@@ -218,8 +187,6 @@ impl Receiver {
                                 // if header.destination_port != self.local_port {
                                 //     continue;
                                 // }
-
- 
 
                                 if header.sequence_number != self.ack_num {
                                     if !self.seen.contains(&header.sequence_number) {
@@ -244,42 +211,11 @@ impl Receiver {
                                     self.send_ack(&data, 0b0001_0000);
                                 }
 
-
-                                // match Self::find_packet_index(&self.in_flight, header.ack_number) {
-                                //     Ok(ind) => {
-                                //         for _ in 0..=ind {
-                                //             self.in_flight.pop_front();
-                                //         }
-                                //     }
-                                //     Err(_) => {}
-                                // }
-
-                                // let fragment = read_to_string(&buf[16..]);
-                                // self.ack_num += fragment.len() as u32;
-
                                 buf.fill(0);
                             }
                             Err(_) => {}
                         }
 
-                        // Send data if there is enough space in sliding window
-                        // while !self.data.is_empty()
-                        //     && (self.cur_wnd - self.cur_buf) as usize > self.data[0].len()
-                        // {
-                        //     let packet_data = self.data.pop_front().unwrap();
-                        //     let header = TcpHeader {
-                        //         source_port: self.local_port,
-                        //         destination_port: self.remote_port,
-                        //         sequence_number: self.seq_num,
-                        //         ack_number: self.ack_num,
-                        //         header_length: 4,
-                        //         flags: 0b0000_1000,
-                        //         window_size: self.wnd_size,
-                        //     };
-
-                        //     self.register_packet(header, &packet_data);
-                        //     self.cur_buf += packet_data.len() as u16;
-                        // }
                     }
                     self.status = Status::Finished;
                     eprintln!("file length: {}", self.file.len());
