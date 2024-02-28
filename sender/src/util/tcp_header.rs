@@ -36,6 +36,7 @@ impl TcpHeader {
         }
     }
 
+    // Convert the header to a byte array
     pub fn as_bytes(&self) -> Vec<u8> {
         let mut res: Vec<u8> = vec![];
         let source_port_str = format!("{:016b}", self.source_port);

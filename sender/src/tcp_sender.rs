@@ -11,22 +11,23 @@ use std::time::Instant;
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
+
 #[derive(Debug)]
 enum Status {
-    StandBy,
+    StandBy, // Waiting for stdin 
     Handshake,
-    Sending,
-    Finished,
+    Sending, // Last step will send FIN packet
+    Finished, // After sending 
 }
 
 #[derive(Clone, Debug)]
 struct Packet {
-    timestamp: Instant,
+    timestamp: Instant, // time when packet is sent
     data: Vec<u8>,
     seq_num: u32,
     ack_num: u32,
-    confirm_ack: u32,
-    data_len: u16,
+    confirm_ack: u32, // Ack number supposed to be, used for retransmission
+    data_len: u16, // length for data
 }
 
 #[derive(Debug)]
@@ -38,21 +39,21 @@ pub struct Sender {
     status: Status,
     seq_num: u32,
     ack_num: u32,
-    expect_seq: VecDeque<u32>,
-    expect_ack: VecDeque<u32>,
-    data: VecDeque<String>,
-    init_seq: u32,
+    expect_seq: VecDeque<u32>, // not used 
+    expect_ack: VecDeque<u32>, // not used 
+    data: VecDeque<String>, // Data that been segmented
+    init_seq: u32, // not used 
     socket: UdpSocket,
-    rto: u64,
+    rto: u64, // 2 * RTT
     rtt: u64,
-    in_flight: VecDeque<Packet>,
-    wnd_size: u16,
-    cur_wnd: u16,
+    in_flight: VecDeque<Packet>, // Packets that are in flight
+    wnd_size: u16, // Initial window size
+    cur_wnd: u16, // Current window size
     ssthresh: u16,
-    cwnd: u16,
-    count: u8,
-    file: String,
-    cur_buf: u16,
+    cwnd: u16, // Congestion window size
+    count: u8, // For duplicate ack
+    file: String, // not used 
+    cur_buf: u16, // Length of data in flight (only bytes, not including header)
     pre_ack: u32,
 }
 
@@ -103,6 +104,7 @@ impl Sender {
 
             match self.status {
                 Status::StandBy => {
+                    // Read from stdin
                     eprintln!("Standby");
                     let mut buffer = String::new();
                     let stdin = io::stdin();
@@ -131,9 +133,7 @@ impl Sender {
                         flags: 0b0000_0010,
                         window_size: self.wnd_size,
                     };
-                    // self.socket.send_to(&header.as_bytes(), format!("{}:{}", self.remote_host, self.remote_port)).map_err(|e| format!("{e} -> Failed to send SYN packet"))?;
-                    // self.expect_ack.push_back(safe_increment(self.seq_num, 1));
-
+                    
                     self.register_packet(header, "");
 
                     let mut buf: [u8; 1500] = [0; 1500];
@@ -147,24 +147,16 @@ impl Sender {
                                     continue;
                                 }
 
-                                if header.flags != 18 {
+                                if header.flags != 18 { // ACK, SYN = 18
                                     continue;
                                 }
-
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
-
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
 
                                 let adv_wnd = self.wnd_size.min(header.window_size);
                                 self.ssthresh = adv_wnd / 1460;
                                 self.cur_wnd = self.cwnd * 1460;
                                 self.in_flight.pop_front();
                                 self.ack_num = safe_increment(header.sequence_number, 1);
-
+                                // After handshake, send data
                                 let header = TcpHeader {
                                     source_port: self.local_port,
                                     destination_port: self.remote_port,
@@ -176,7 +168,7 @@ impl Sender {
                                 };
 
                                 self.register_packet(header, "");
-                                self.status = Status::Sending;
+                                self.status = Status::Sending; // Change status to sending
                                 break;
                             }
                             Err(_) => {}
@@ -200,16 +192,6 @@ impl Sender {
                                 if header.flags != 16 {
                                     continue;
                                 }
-
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
-
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
-                                // self.cur_wnd = self.wnd_size.min(header.window_size);
 
                                 if header.ack_number == self.pre_ack {
                                 
@@ -291,7 +273,7 @@ impl Sender {
                             self.cur_buf += packet_data.len() as u16;
                         }
                     }
-                    self.status = Status::Finished;
+                    self.status = Status::Finished; 
                 }
                 Status::Finished => {
                     eprintln!("Finished");
@@ -334,6 +316,7 @@ impl Sender {
         Ok(())
     }
 
+    // Update RTO using RTT
     fn update_rto(&mut self, rtt: u128) {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 5 {
@@ -344,6 +327,7 @@ impl Sender {
         self.rto = self.rtt * 2;
     }
 
+    // Find the index of the packet with the given ack number
     fn find_packet_index(in_flight: &VecDeque<Packet>, ack_num: u32) -> Result<usize, ()> {
         for (ind, packet) in in_flight.iter().enumerate() {
             if packet.confirm_ack == ack_num {
@@ -353,6 +337,7 @@ impl Sender {
         Err(())
     }
 
+    // Prepare and send a packet
     fn register_packet(&mut self, header: TcpHeader, data: &str) {
         let mut packet_data: Vec<u8> = Vec::new();
         let seq_num = header.sequence_number;
@@ -425,7 +410,7 @@ impl Sender {
             }
         }
     }
-
+    
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
             match socket.send_to(packet_data, format!("{}:{}", remote_host, remote_port)) {

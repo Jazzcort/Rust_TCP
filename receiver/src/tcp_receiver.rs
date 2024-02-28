@@ -11,7 +11,7 @@ use crate::{read_to_string, safe_increment};
 
 #[derive(Debug)]
 enum Status {
-    StandBy,
+    StandBy, // Waiting for the first packet from sender (handshake)
     Handshake,
     Sending,
     Finished,
@@ -46,8 +46,8 @@ pub struct Receiver {
     cur_wnd: u16,
     file: String,
     cur_buf: u16,
-    cache: HashMap<u32, String>,
-    seen: HashSet<u32>
+    cache: HashMap<u32, String>, // check broked order 
+    seen: HashSet<u32> 
 }
 
 impl Receiver {
@@ -234,6 +234,7 @@ impl Receiver {
         Ok(())
     }
 
+    // can delete 
     fn find_packet_index(in_flight: &VecDeque<Packet>, ack_num: u32) -> Result<usize, ()> {
         for (ind, packet) in in_flight.iter().enumerate() {
             if packet.confirm_ack == ack_num {
@@ -243,9 +244,11 @@ impl Receiver {
         Err(())
     }
 
+
     fn register_cache(&mut self, ack_num: u32, data: String) {
         self.cache.insert(ack_num, data);
     }
+
 
     fn check_cache(&mut self, mut seq_num: u32) -> String {
         let mut data = String::new();
@@ -281,64 +284,6 @@ impl Receiver {
         self.seq_num = safe_increment(self.seq_num, 1);
     }
 
-    fn register_packet(&mut self, header: TcpHeader, data: &str) {
-        let mut packet_data: Vec<u8> = Vec::new();
-        let seq_num = header.sequence_number;
-        let ack_num = header.ack_number;
-
-        for d in header.as_bytes() {
-            packet_data.push(d);
-        }
-
-        let mut data_len: u16 = 0;
-        for d in data.as_bytes() {
-            packet_data.push(*d);
-            data_len += 1;
-        }
-
-        if data_len == 0 {
-            data_len = 1;
-        }
-
-        let packet = Packet {
-            timestamp: Instant::now(),
-            data: packet_data.clone(),
-            seq_num,
-            ack_num,
-            confirm_ack: safe_increment(seq_num, data_len as u32),
-            data_len,
-        };
-
-        self.in_flight.push_back(packet);
-
-        Self::send_data(
-            &self.remote_host,
-            &self.remote_port,
-            packet_data.as_slice(),
-            &self.socket,
-        );
-
-        self.seq_num = safe_increment(seq_num, data_len as u32);
-    }
-
-    fn check_retransmission(&mut self) {
-        for packet in self.in_flight.iter_mut() {
-            let instant = Instant::now();
-            let duration = instant.duration_since(packet.timestamp.clone());
-
-            if duration >= Duration::from_millis(self.rto) {
-                Self::send_data(
-                    &self.remote_host,
-                    &self.remote_port,
-                    packet.data.as_slice(),
-                    &self.socket,
-                );
-                packet.timestamp = Instant::now();
-            } else {
-                return;
-            }
-        }
-    }
 
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
