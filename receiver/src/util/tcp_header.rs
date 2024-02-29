@@ -36,34 +36,42 @@ impl TcpHeader {
         }
     }
 
+    // Convert the header to a byte array
     pub fn as_bytes(&self) -> Vec<u8> {
         let mut res: Vec<u8> = vec![];
-        let source_port_str = format!("{:016b}", self.source_port);
+        // Get the source port as a byte and push it to the result
+        let source_port_str = format!("{:016b}", self.source_port); // convert to string of 16 bits
         res.push(u8::from_str_radix(&source_port_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&source_port_str[8..], 2).unwrap());
 
+        // Get the destination port as a byte and push it to the result
         let dst_port_str = format!("{:016b}", self.destination_port);
         res.push(u8::from_str_radix(&dst_port_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&dst_port_str[8..], 2).unwrap());
 
+        // Get the sequence number as a byte and push it to the result
         let seq_num_str = format!("{:032b}", self.sequence_number);
         res.push(u8::from_str_radix(&seq_num_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&seq_num_str[8..16], 2).unwrap());
         res.push(u8::from_str_radix(&seq_num_str[16..24], 2).unwrap());
         res.push(u8::from_str_radix(&seq_num_str[24..], 2).unwrap());
 
+        // Get the ack number as a byte and push it to the result
         let ack_num_str = format!("{:032b}", self.ack_number);
         res.push(u8::from_str_radix(&ack_num_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[8..16], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[16..24], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[24..], 2).unwrap());
         
+        // Get the header length as a byte and push it to the result
         let head_len_str = format!("{:08b}", self.header_length << 4);
         res.push(u8::from_str_radix(&head_len_str[..], 2).unwrap());
         
+        // Get the flags as a byte and push it to the result
         let flag_str = format!("{:08b}", self.flags);
         res.push(u8::from_str_radix(&flag_str[..], 2).unwrap());
 
+        // We don't need this (maybe)
         let wnd_size_str = format!("{:016b}", self.window_size);
         res.push(u8::from_str_radix(&wnd_size_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&wnd_size_str[8..], 2).unwrap());
