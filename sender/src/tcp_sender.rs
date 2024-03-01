@@ -190,6 +190,26 @@ impl Sender {
                     while !self.in_flight.is_empty() || !self.data.is_empty() {
                         self.check_retransmission();
 
+                        // Send data if there is enough space in sliding window
+                        while !self.data.is_empty()
+                            && self.cur_wnd > self.cur_buf
+                            && (self.cur_wnd - self.cur_buf) > self.data[0].len() as u16
+                        {
+                            let packet_data = self.data.pop_front().unwrap();
+                            let header = TcpHeader {
+                                source_port: self.local_port,
+                                destination_port: self.remote_port,
+                                sequence_number: self.seq_num,
+                                ack_number: self.ack_num,
+                                header_length: 4,
+                                flags: 0b0001_1000,
+                                window_size: self.wnd_size,
+                            };
+
+                            self.register_packet(header, &packet_data);
+                            self.cur_buf += packet_data.len() as u16;
+                        }
+
                         // eprintln!("inflight: {}, data: {}", self.in_flight.len(), self.data.len());
 
                         let mut buf: [u8; 1500] = [0; 1500];
@@ -222,8 +242,9 @@ impl Sender {
                                 } else {
                                     self.count = 0;
 
-                                    if self.cur_wnd > self.ssthresh {
-                                        self.cwnd += 1;
+                                    if self.cwnd > self.ssthresh {
+                                        self.cwnd += 2;
+                                        eprintln!("greater than ssthresh");
                                     } else {
                                         self.cwnd = self.cwnd << 1;
                                     }
@@ -242,6 +263,7 @@ impl Sender {
                                 eprintln!("cur_buf: {}", self.cur_buf);
                                 eprintln!("pre_ack: {}", self.pre_ack);
                                 eprintln!("in flight: {}", self.in_flight.len());
+                                eprintln!("ssthresh: {}", self.ssthresh);
 
                                 match Self::find_packet_index(&self.in_flight, header.ack_number) {
                                     Ok(ind) => {
@@ -271,25 +293,7 @@ impl Sender {
                             Err(_) => {}
                         }
 
-                        // Send data if there is enough space in sliding window
-                        while !self.data.is_empty()
-                            && self.cur_wnd > self.cur_buf
-                            && (self.cur_wnd - self.cur_buf) > self.data[0].len() as u16
-                        {
-                            let packet_data = self.data.pop_front().unwrap();
-                            let header = TcpHeader {
-                                source_port: self.local_port,
-                                destination_port: self.remote_port,
-                                sequence_number: self.seq_num,
-                                ack_number: self.ack_num,
-                                header_length: 4,
-                                flags: 0b0001_1000,
-                                window_size: self.wnd_size,
-                            };
-
-                            self.register_packet(header, &packet_data);
-                            self.cur_buf += packet_data.len() as u16;
-                        }
+                        
                     }
                     self.status = Status::Finished;
                 }
@@ -395,10 +399,11 @@ impl Sender {
 
     fn check_retransmission(&mut self) {
         let mut num = self.cwnd;
+        let mut cnt: u16 = 0;
 
         for packet in self.in_flight.iter_mut() {
             if num == 0 {
-                return;
+                break;
             }
 
             let instant = Instant::now();
@@ -419,11 +424,25 @@ impl Sender {
                     duration.as_millis(),
                     self.rto
                 );
+
+                if num == self.cwnd {
+                    self.ssthresh = self.cwnd / 2;
+                }
+
                 num -= 1;
+                cnt += 1;
+
+                if cnt == self.ssthresh {
+                    break;
+                }
             } else {
-                return;
+                break;
             }
         }
+
+        // if num != self.cwnd {
+        //     self.cwnd = 2;
+        // }
     }
 
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
