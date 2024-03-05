@@ -6,6 +6,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::thread::sleep;
 
+use sha2::{Sha256, Digest};
+use generic_array::GenericArray;
+use typenum::U32;
+
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
@@ -98,7 +102,7 @@ impl Receiver {
                     loop {
                         match self.socket.recv_from(&mut buf) {
                             Ok((_, addr)) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
 
                                 if header.flags != 2 {
                                     continue;
@@ -130,7 +134,7 @@ impl Receiver {
 
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
 
                                 if header.sequence_number != self.ack_num {
                                     continue;
@@ -159,7 +163,7 @@ impl Receiver {
                         let mut buf: [u8; 1500] = [0; 1500];
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
                                 
                                 // ACK + PSH, ACK, FIN
                                 if header.flags != 24 && header.flags != 16 && header.flags != 1 {
