@@ -114,7 +114,7 @@ impl Sender {
 
                     self.data = buffer
                         .as_bytes() // convert string to bytes
-                        .chunks(1460) // split into chunks of 1460 bytes and return an iterator
+                        .chunks(1450) // split into chunks of 1450 bytes and return an iterator
                         .map(|ch| String::from_utf8_lossy(ch).to_string()) // Turn each chunk into a string
                         .collect();
                     eprintln!("data length: {}", self.data.len());
@@ -154,9 +154,9 @@ impl Sender {
                                 }
                                 // Set window size to minimum of receiver adv window and sender's adv window size
                                 let adv_wnd = self.wnd_size.min(header.window_size);
-                                // Set sshtresh to adv_wnd / 1460
-                                self.ssthresh = adv_wnd / 1460;
-                                self.cur_wnd = self.cwnd * 1460; 
+                                // Set sshtresh to adv_wnd / 1450
+                                self.ssthresh = adv_wnd / 1450;
+                                self.cur_wnd = self.cwnd * 1450; 
                                 self.in_flight.pop_front();
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
@@ -220,7 +220,7 @@ impl Sender {
                                     self.cwnd = 2;
                                 }
 
-                                self.cur_wnd = self.cwnd * 1460;
+                                self.cur_wnd = self.cwnd * 1450;
 
                                 eprintln!("cwnd: {}", self.cwnd);
                                 eprintln!("cur_wnd: {}", self.cur_wnd);
