@@ -142,7 +142,7 @@ impl Sender {
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 // The first 16 bytes of the buffer are used to create a new TcpHeader instance.
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
                                 buf.fill(0);
 
                                 if header.ack_number != self.in_flight[0].confirm_ack {
@@ -189,7 +189,7 @@ impl Sender {
                         let mut buf: [u8; 1500] = [0; 1500];
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
 
                                 if header.flags != 16 { // ACK = 16
                                     continue;
@@ -302,7 +302,7 @@ impl Sender {
                         self.check_retransmission(); // Check if it's RTO
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
 
                                 if header.ack_number == self.in_flight[0].confirm_ack {
                                     break;
@@ -322,6 +322,9 @@ impl Sender {
         // sleep(Duration::from_millis(800));
         Ok(())
     }
+
+    // Halper function to hash the data packet and confirm with the hash value in the header
+
 
     // Update RTO using RTT
     fn update_rto(&mut self, rtt: u128) {
