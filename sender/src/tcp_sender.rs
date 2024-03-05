@@ -118,7 +118,7 @@ impl Sender {
 
                     self.data = buffer
                         .as_bytes() // convert string to bytes
-                        .chunks(1450) // split into chunks of 1450 bytes and return an iterator
+                        .chunks(1440) // split into chunks of 1440 bytes and return an iterator
                         .map(|ch| String::from_utf8_lossy(ch).to_string()) // Turn each chunk into a string
                         .collect();
                     eprintln!("data length: {}", self.data.len());
@@ -139,7 +139,6 @@ impl Sender {
 
                     // Get the hash value of the header
                     header.hash_value = header.calculate_header_hash();
-                    
                     // Prepare the packet to in flight, and send it
                     self.register_packet(header, ""); 
 
@@ -154,6 +153,12 @@ impl Sender {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
+                                    eprintln!("hash mismatch");
+                                    // check the tcp header
+                                    eprintln!("header: {:?}", header);
+
+
+                                    eprintln!("sender hash: {:?}", header.hash_value);
                                     continue;
                                 }
 
@@ -166,9 +171,9 @@ impl Sender {
                                 }
                                 // Set window size to minimum of receiver adv window and sender's adv window size
                                 let adv_wnd = self.wnd_size.min(header.window_size);
-                                // Set sshtresh to adv_wnd / 1450
-                                self.ssthresh = adv_wnd / 1450;
-                                self.cur_wnd = self.cwnd * 1450; 
+                                // Set sshtresh to adv_wnd / 1440
+                                self.ssthresh = adv_wnd / 1440;
+                                self.cur_wnd = self.cwnd * 1440; 
                                 self.in_flight.pop_front();
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
@@ -207,10 +212,12 @@ impl Sender {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
+                                    eprintln!("Sending hash mismatch");
                                     continue;
                                 }
 
                                 if header.flags != 16 { // ACK = 16
+                                    eprintln!("Sending flag mismatch");
                                     continue;
                                 }
                                 // Adjust cwnd and ssthresh
@@ -239,7 +246,7 @@ impl Sender {
                                     self.cwnd = 2;
                                 }
 
-                                self.cur_wnd = self.cwnd * 1450;
+                                self.cur_wnd = self.cwnd * 1440;
 
                                 eprintln!("cwnd: {}", self.cwnd);
                                 eprintln!("cur_wnd: {}", self.cur_wnd);
@@ -418,6 +425,7 @@ impl Sender {
 
         // Adds the constructed packet to a queue (in_flight) of packets that have been sent but not yet acknowledged.
         self.in_flight.push_back(packet);
+
 
         Self::send_data(
             &self.remote_host,

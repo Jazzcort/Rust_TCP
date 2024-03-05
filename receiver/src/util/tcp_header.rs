@@ -143,6 +143,9 @@ impl TcpHeader {
         res.push(u8::from_str_radix(&wnd_size_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&wnd_size_str[8..], 2).unwrap());
 
+        // Get the hash value as a byte and push it to the result
+        res.extend_from_slice(&self.hash_value);
+
         res
     }
 }

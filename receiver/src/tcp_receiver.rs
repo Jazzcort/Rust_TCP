@@ -106,8 +106,11 @@ impl Receiver {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
+
                                     continue;
                                 }
+
+
 
                                 if header.flags != 2 {
                                     continue;
@@ -182,6 +185,7 @@ impl Receiver {
                                 
                                 // If it's ACK from the handshake
                                 if header.flags == 16 {
+
                                     // Check if the hash value of the header matches the hash value in the header
                                     if !Self::check_hash(&header) {
                                         continue;
@@ -192,6 +196,9 @@ impl Receiver {
                                 if header.flags == 24 {
                                     // Check if the hash value of the header and data matches the hash value in the header
                                     if !Self::check_header_data_hash(&header, &buf[48..]) {
+                                        // print out buf[48..] to see if it's the same as the sender's
+
+                                        eprintln!("24 receiver hash value not match");
                                         continue;
                                     }
                                 }
@@ -247,6 +254,7 @@ impl Receiver {
 
     // Helper function to check if the hash value of the header and data matches the hash value in the header
     fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
+        eprintln!("receiver header: {:?}", header);
         let hash = header.calculate_header_data_hash(data);
         hash == header.hash_value
     }
@@ -287,7 +295,8 @@ impl Receiver {
 
         // Get the hash value of the header
         header.hash_value = header.calculate_header_hash();
-
+        // Print out hash
+        eprintln!("receiver hash: {:?}", header.hash_value);
         let mut bytes = header.as_bytes();
         // bytes.push(47);
 

@@ -22,13 +22,13 @@ struct Cli {
 
 
 fn main() -> Result<(), String> {
-    // let cli = Cli::parse();
+    let cli = Cli::parse();
 
-    // let port = cli.recv_port.parse::<u16>().unwrap();
+    let port = cli.recv_port.parse::<u16>().unwrap();
 
-    // let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string()).unwrap();
+    let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string()).unwrap();
 
-    // sender.start();
+    sender.start();
 
 
     
