@@ -18,7 +18,7 @@ pub struct TcpHeader {
 impl TcpHeader {
     // Create a new TCP header
     pub fn new(header_bytes: &[u8]) -> Self {
-        if header_bytes.len() < 16 {
+        if header_bytes.len() < 48 {
             panic!("Header too short");
         }
         // Parse the header bytes into the fields of the header
