@@ -283,7 +283,7 @@ impl Sender {
                             && (self.cur_wnd - self.cur_buf) > self.data[0].len() as u16
                         {
                             let packet_data = self.data.pop_front().unwrap();
-                            let header = TcpHeader {
+                            let mut header = TcpHeader {
                                 source_port: self.local_port,
                                 destination_port: self.remote_port,
                                 sequence_number: self.seq_num,
@@ -294,6 +294,9 @@ impl Sender {
                                 hash_value: [0; 32].into(), // testing
                             };
 
+                            // Hash header and data
+                            header.hash_value = header.calculate_header_data_hash(packet_data.as_bytes());
+
                             self.register_packet(header, &packet_data);
                             self.cur_buf += packet_data.len() as u16;
                         }
@@ -303,7 +306,7 @@ impl Sender {
                 Status::Finished => {
                     eprintln!("Finished");
 
-                    let header = TcpHeader {
+                    let mut header = TcpHeader {
                         source_port: self.local_port,
                         destination_port: self.remote_port,
                         sequence_number: self.seq_num,
@@ -313,6 +316,9 @@ impl Sender {
                         window_size: self.wnd_size,
                         hash_value: [0; 32].into(), // testing
                     };
+
+                    // Get the hash value of the header
+                    header.hash_value = header.calculate_header_hash();
 
                     self.register_packet(header, "");
 
