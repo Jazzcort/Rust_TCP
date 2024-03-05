@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.4.18", features = ["derive"] }
 rand = "0.8.5"
+sha2 = "0.10"
+generic-array = "0.14.4"
+typenum = "1.14.0"

@@ -1,3 +1,7 @@
+use sha2::{Sha256, Digest};
+use generic_array::GenericArray;
+use typenum::U32;
+
 // TCP header struct, total 16 bytes
 #[derive(Debug)]
 pub struct TcpHeader {
@@ -8,13 +12,14 @@ pub struct TcpHeader {
     pub header_length: u8,
     pub flags: u8, // URG, ACK, PSH, RST, SYN, FIN (each 1 bit)
     pub window_size: u16,
+    pub hash_value: GenericArray<u8, U32>, // 32 bytes of hash value
 }
 
 // Implement the TCP header
 impl TcpHeader {
     // Create a new TCP header
     pub fn new(header_bytes: &[u8]) -> Self {
-        if header_bytes.len() < 16 {
+        if header_bytes.len() < 48 {
             panic!("Header too short");
         }
         // Parse the header bytes into the fields of the header
@@ -25,6 +30,7 @@ impl TcpHeader {
         let header_length = header_bytes[12] >> 4; // get the first 4 bits
         let flags = header_bytes[13] & 0b0011_1111; // get the last 6 bits
         let window_size = u16::from_be_bytes(header_bytes[14..16].try_into().unwrap());
+        let hash_value = GenericArray::clone_from_slice(&header_bytes[16..48]);
 
         TcpHeader {
             source_port,
@@ -34,8 +40,12 @@ impl TcpHeader {
             header_length,
             flags,
             window_size,
+            hash_value,
         }
     }
+
+    // Function to calculate the hash of the header and data
+    // fn calculate_hash()
 
     // Convert the header to a byte array
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -72,10 +82,13 @@ impl TcpHeader {
         let flag_str = format!("{:08b}", self.flags);
         res.push(u8::from_str_radix(&flag_str[..], 2).unwrap());
 
-        // We don't need this (maybe)
+        // Get the window size as a byte and push it to the result
         let wnd_size_str = format!("{:016b}", self.window_size);
         res.push(u8::from_str_radix(&wnd_size_str[..8], 2).unwrap());
         res.push(u8::from_str_radix(&wnd_size_str[8..], 2).unwrap());
+
+        // Get the hash value as a byte and push it to the result
+        res.extend_from_slice(&self.hash_value);
 
         res
     }

@@ -130,6 +130,7 @@ impl Sender {
                         header_length: 4, // unit of 4 bytes
                         flags: 0b0000_0010,
                         window_size: self.wnd_size,
+                        hash_value: [0; 32].into(), // testing
                     };
                     
                     // Prepare the packet to in flight, and send it
@@ -167,6 +168,7 @@ impl Sender {
                                     header_length: 4,
                                     flags: 0b0001_0000,
                                     window_size: self.wnd_size,
+                                    hash_value: [0; 32].into(), // testing
                                 };
 
                                 self.register_packet(header, "");
@@ -270,6 +272,7 @@ impl Sender {
                                 header_length: 4,
                                 flags: 0b0001_1000,
                                 window_size: self.wnd_size,
+                                hash_value: [0; 32].into(), // testing
                             };
 
                             self.register_packet(header, &packet_data);
@@ -289,6 +292,7 @@ impl Sender {
                         header_length: 4,
                         flags: 0b0000_0001,
                         window_size: self.wnd_size,
+                        hash_value: [0; 32].into(), // testing
                     };
 
                     self.register_packet(header, "");
