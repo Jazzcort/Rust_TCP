@@ -8,6 +8,10 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
+use sha2::{Sha256, Digest};
+use generic_array::GenericArray;
+use typenum::U32;
+
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
@@ -122,7 +126,7 @@ impl Sender {
                 }
                 Status::Handshake => {
                     eprintln!("Handshake");
-                    let header = TcpHeader {
+                    let mut header = TcpHeader {
                         source_port: self.local_port,
                         destination_port: self.remote_port, // simulator's port
                         sequence_number: self.seq_num,
@@ -132,6 +136,9 @@ impl Sender {
                         window_size: self.wnd_size,
                         hash_value: [0; 32].into(), // testing
                     };
+
+                    // Get the hash value of the header
+                    header.hash_value = header.calculate_header_hash();
                     
                     // Prepare the packet to in flight, and send it
                     self.register_packet(header, ""); 
@@ -144,6 +151,11 @@ impl Sender {
                                 // The first 16 bytes of the buffer are used to create a new TcpHeader instance.
                                 let header = TcpHeader::new(&buf[..48]);
                                 buf.fill(0);
+
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
 
                                 if header.ack_number != self.in_flight[0].confirm_ack {
                                     continue;
@@ -160,7 +172,7 @@ impl Sender {
                                 self.in_flight.pop_front();
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
-                                let header = TcpHeader {
+                                let mut header = TcpHeader {
                                     source_port: self.local_port,
                                     destination_port: self.remote_port,
                                     sequence_number: self.seq_num, 
@@ -170,6 +182,8 @@ impl Sender {
                                     window_size: self.wnd_size,
                                     hash_value: [0; 32].into(), // testing
                                 };
+                                // Get the hash value of the header
+                                header.hash_value = header.calculate_header_hash();
 
                                 self.register_packet(header, "");
                                 self.status = Status::Sending; // Change status to sending
@@ -190,6 +204,11 @@ impl Sender {
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..48]);
+
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
 
                                 if header.flags != 16 { // ACK = 16
                                     continue;
@@ -303,6 +322,10 @@ impl Sender {
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..48]);
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
 
                                 if header.ack_number == self.in_flight[0].confirm_ack {
                                     break;
@@ -323,8 +346,17 @@ impl Sender {
         Ok(())
     }
 
-    // Halper function to hash the data packet and confirm with the hash value in the header
+    // Helper function to check if the hash value of the header matches the hash value in the header
+    fn check_hash(header: &TcpHeader) -> bool {
+        let hash = header.calculate_header_hash();
+        hash == header.hash_value
+    }
 
+    // Helper function to check if the hash value of the header and data matches the hash value in the header
+    fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
+        let hash = header.calculate_header_data_hash(data);
+        hash == header.hash_value
+    }
 
     // Update RTO using RTT
     fn update_rto(&mut self, rtt: u128) {
