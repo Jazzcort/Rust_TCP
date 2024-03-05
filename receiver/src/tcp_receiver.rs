@@ -104,6 +104,11 @@ impl Receiver {
                             Ok((_, addr)) => {
                                 let header = TcpHeader::new(&buf[..48]);
 
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
+
                                 if header.flags != 2 {
                                     continue;
                                 }
