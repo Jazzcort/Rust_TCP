@@ -1,6 +1,4 @@
-
-
-// Buffer to string from UDP packet
+// Read in a buffer and return a string up to the first null byte
 pub fn read_to_string(buf: &[u8]) -> String {
     for ind in 0..buf.len() {
         if buf[ind] == 0 {
@@ -10,13 +8,16 @@ pub fn read_to_string(buf: &[u8]) -> String {
     String::from_utf8_lossy(&buf).to_string()
 }
 
-// Safe increment for sequence numbers
+// Safely increment a sequence number
 pub fn safe_increment(cur_seq: u32, add_bytes: u32) -> u32 {
+    // Calculate how far we are from wrapping around
     let dst_to_wrap = u32::MAX - cur_seq;
 
+    // Overflow
     if dst_to_wrap < add_bytes {
         add_bytes - dst_to_wrap
-    } else {
+    } // No overflow 
+    else {
         cur_seq + add_bytes
     }
 }

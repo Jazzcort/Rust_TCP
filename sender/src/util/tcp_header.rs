@@ -1,4 +1,4 @@
-// TCP header struct
+// TCP header struct, total 16 bytes
 #[derive(Debug)]
 pub struct TcpHeader {
     pub source_port: u16,

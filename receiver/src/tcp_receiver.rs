@@ -46,8 +46,8 @@ pub struct Receiver {
     cur_wnd: u16,
     file: String,
     cur_buf: u16,
-    cache: HashMap<u32, String>, // check broked order 
-    seen: HashSet<u32> 
+    cache: HashMap<u32, String>, // check broken order 
+    seen: HashSet<u32> // Include correct and broken order
 }
 
 impl Receiver {
@@ -100,10 +100,6 @@ impl Receiver {
                             Ok((_, addr)) => {
                                 let header = TcpHeader::new(&buf[..16]);
 
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
                                 if header.flags != 2 {
                                     continue;
                                 }
@@ -131,7 +127,6 @@ impl Receiver {
                     eprintln!("Handshake");
                     let mut buf: [u8; 1500] = [0; 1500];
                     loop {
-                        // self.check_retransmission();
 
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
@@ -144,16 +139,6 @@ impl Receiver {
                                 if header.flags != 16 {
                                     continue;
                                 }
-
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
-
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
-                                // self.in_flight.pop_front();
                                 
                                 self.send_ack("1", 0b0001_0000);
                                 self.status = Status::Sending;
@@ -175,19 +160,13 @@ impl Receiver {
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..16]);
-
+                                
+                                // ACK + PSH, ACK, FIN
                                 if header.flags != 24 && header.flags != 16 && header.flags != 1 {
                                     continue;
                                 }
 
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
-
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
+                                // For out-of-order packets, it checks if the sequence number has been seen before.
                                 if header.sequence_number != self.ack_num {
                                     if !self.seen.contains(&header.sequence_number) {
                                         self.seen.insert(header.sequence_number);
@@ -202,11 +181,12 @@ impl Receiver {
                                         break;
                                     }
 
+                                    // Marks the packet's sequence number as seen.
                                     self.seen.insert(header.sequence_number);
                                     let mut data = read_to_string(&buf[16..]);
-                                    let cached_date = self.check_cache(safe_increment(self.ack_num, data.len() as u32));
+                                    let cached_data = self.check_cache(safe_increment(self.ack_num, data.len() as u32));
 
-                                    data.push_str(&cached_date);
+                                    data.push_str(&cached_data);
                                     self.file.push_str(&data);
                                     self.send_ack(&data, 0b0001_0000);
                                 }
@@ -219,29 +199,14 @@ impl Receiver {
                     }
                     self.status = Status::Finished;
                     eprintln!("file length: {}", self.file.len());
-                    // dbg!(&self.cache);
                 }
                 Status::Finished => {
                     self.send_ack("1", 0b0000_0001);
                     sleep(Duration::from_millis(100));
-
-                    // eprintln!("Finished");
-                    // dbg!(&self.file);
-                    // break;
                 }
             }
         }
         Ok(())
-    }
-
-    // can delete 
-    fn find_packet_index(in_flight: &VecDeque<Packet>, ack_num: u32) -> Result<usize, ()> {
-        for (ind, packet) in in_flight.iter().enumerate() {
-            if packet.confirm_ack == ack_num {
-                return Ok(ind);
-            }
-        }
-        Err(())
     }
 
 
@@ -249,7 +214,7 @@ impl Receiver {
         self.cache.insert(ack_num, data);
     }
 
-
+    // Retrieve and concatenate data from a cache based on sequential packet sequence numbers.
     fn check_cache(&mut self, mut seq_num: u32) -> String {
         let mut data = String::new();
 

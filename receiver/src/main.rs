@@ -10,12 +10,7 @@ use tcp_receiver::Receiver;
 use std::hash::{ Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-#[derive(Hash)]
-struct Person {
-    id: u32,
-    name: String,
-    phone: u64,
-}
+
 fn main() {
 
     let mut receiver = Receiver::new("127.0.0.1".to_string()).unwrap();
