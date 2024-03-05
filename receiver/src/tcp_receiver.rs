@@ -136,6 +136,11 @@ impl Receiver {
                             Ok(_) => {
                                 let header = TcpHeader::new(&buf[..48]);
 
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
+
                                 if header.sequence_number != self.ack_num {
                                     continue;
                                 }
@@ -169,12 +174,28 @@ impl Receiver {
                                 if header.flags != 24 && header.flags != 16 && header.flags != 1 {
                                     continue;
                                 }
+                                
+                                // If it's ACK from the handshake
+                                if header.flags == 16 {
+                                    // Check if the hash value of the header matches the hash value in the header
+                                    if !Self::check_hash(&header) {
+                                        continue;
+                                    }
+                                }
+
+                                // If it's ACK + PSH from the sending phase
+                                if header.flags == 24 {
+                                    // Check if the hash value of the header and data matches the hash value in the header
+                                    if !Self::check_header_data_hash(&header, &buf[48..]) {
+                                        continue;
+                                    }
+                                }
 
                                 // For out-of-order packets, it checks if the sequence number has been seen before.
                                 if header.sequence_number != self.ack_num {
                                     if !self.seen.contains(&header.sequence_number) {
                                         self.seen.insert(header.sequence_number);
-                                        self.cache.insert(header.sequence_number, read_to_string(&buf[16..]));
+                                        self.cache.insert(header.sequence_number, read_to_string(&buf[48..]));
                                     }
                                     self.send_ack("", 0b0001_0000);
                                 } else {
@@ -187,7 +208,7 @@ impl Receiver {
 
                                     // Marks the packet's sequence number as seen.
                                     self.seen.insert(header.sequence_number);
-                                    let mut data = read_to_string(&buf[16..]);
+                                    let mut data = read_to_string(&buf[48..]);
                                     let cached_data = self.check_cache(safe_increment(self.ack_num, data.len() as u32));
 
                                     data.push_str(&cached_data);
@@ -211,6 +232,18 @@ impl Receiver {
             }
         }
         Ok(())
+    }
+
+    // Helper function to check if the hash value of the header matches the hash value in the header
+    fn check_hash(header: &TcpHeader) -> bool {
+        let hash = header.calculate_header_hash();
+        hash == header.hash_value
+    }
+
+    // Helper function to check if the hash value of the header and data matches the hash value in the header
+    fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
+        let hash = header.calculate_header_data_hash(data);
+        hash == header.hash_value
     }
 
 
