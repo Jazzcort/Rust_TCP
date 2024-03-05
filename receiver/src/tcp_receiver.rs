@@ -236,15 +236,19 @@ impl Receiver {
             self.ack_num = safe_increment(self.ack_num, data.len() as u32);
         }
         
-        let header = TcpHeader {
+        let mut header = TcpHeader {
             source_port: self.local_port,
             destination_port: self.remote_port,
             sequence_number: self.seq_num,
             ack_number: self.ack_num,
             header_length: 4,
             flags,
-            window_size: self.wnd_size
+            window_size: self.wnd_size,
+            hash_value: [0; 32].into(), // testing
         };
+
+        // Get the hash value of the header
+        header.hash_value = header.calculate_header_hash();
 
         let mut bytes = header.as_bytes();
         // bytes.push(47);
