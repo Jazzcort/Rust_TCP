@@ -6,17 +6,23 @@ use std::time::Duration;
 use std::time::Instant;
 use std::thread::sleep;
 
+use sha2::{Sha256, Digest};
+use generic_array::GenericArray;
+use typenum::U32;
+
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
+// Receiver state
 #[derive(Debug)]
 enum Status {
-    StandBy,
+    StandBy, // Waiting for the first packet from sender (handshake)
     Handshake,
     Sending,
     Finished,
 }
 
+// Packet struct
 #[derive(Clone, Debug)]
 struct Packet {
     timestamp: Instant,
@@ -27,6 +33,7 @@ struct Packet {
     data_len: u16,
 }
 
+// Receiver struct
 #[derive(Debug)]
 pub struct Receiver {
     remote_host: String,
@@ -46,11 +53,12 @@ pub struct Receiver {
     cur_wnd: u16,
     file: String,
     cur_buf: u16,
-    cache: HashMap<u32, String>,
-    seen: HashSet<u32>
+    cache: HashMap<u32, String>, // check broken order 
+    seen: HashSet<u32> // Include correct and broken order
 }
 
 impl Receiver {
+    // Constructor
     pub fn new(local_host: String) -> Result<Self, String> {
         let mut rng = rand::thread_rng();
         let seq_num: u32 = rng.gen();
@@ -88,22 +96,23 @@ impl Receiver {
             seen: HashSet::new()
         })
     }
-
+    // Start the receiver
     pub fn start(&mut self) -> Result<(), String> {
         loop {
             match self.status {
+                // Get the SYN packet from the sender
                 Status::StandBy => {
                     eprintln!("Standby");
                     let mut buf: [u8; 1500] = [0; 1500];
                     loop {
                         match self.socket.recv_from(&mut buf) {
                             Ok((_, addr)) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
 
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
                                 if header.flags != 2 {
                                     continue;
                                 }
@@ -127,15 +136,20 @@ impl Receiver {
 
                     self.status = Status::Handshake;
                 }
+                // Get the ACK packet from the sender
                 Status::Handshake => {
                     eprintln!("Handshake");
                     let mut buf: [u8; 1500] = [0; 1500];
                     loop {
-                        // self.check_retransmission();
 
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
+                                let header = TcpHeader::new(&buf[..48]);
+
+                                // Check if the hash value of the header matches the hash value in the header
+                                if !Self::check_hash(&header) {
+                                    continue;
+                                }
 
                                 if header.sequence_number != self.ack_num {
                                     continue;
@@ -144,16 +158,6 @@ impl Receiver {
                                 if header.flags != 16 {
                                     continue;
                                 }
-
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
-
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
-
-                                // self.in_flight.pop_front();
                                 
                                 self.send_ack("1", 0b0001_0000);
                                 self.status = Status::Sending;
@@ -167,6 +171,7 @@ impl Receiver {
 
                     self.status = Status::Sending;
                 }
+                // Get the data packet from the sender and send ACK back
                 Status::Sending => {
                     eprintln!("Sending");
                     loop {
@@ -174,24 +179,41 @@ impl Receiver {
                         let mut buf: [u8; 1500] = [0; 1500];
                         match self.socket.recv(&mut buf) {
                             Ok(_) => {
-                                let header = TcpHeader::new(&buf[..16]);
-
+                                let header = TcpHeader::new(&buf[..48]);
+                                
+                                // ACK + PSH, ACK, FIN
                                 if header.flags != 24 && header.flags != 16 && header.flags != 1 {
                                     continue;
                                 }
+                                
+                                // If it's ACK from the handshake
+                                if header.flags == 16 {
 
-                                // if header.source_port != self.remote_port {
-                                //     continue;
-                                // }
+                                    // Check if the hash value of the header matches the hash value in the header
+                                    if !Self::check_hash(&header) {
+                                        continue;
+                                    }
+                                }
 
-                                // if header.destination_port != self.local_port {
-                                //     continue;
-                                // }
+                                // If it's ACK + PSH from the sending phase
+                                if header.flags == 24 {
+                                    // Check if the hash value of the header and data matches the hash value in the header
+                                    if !Self::check_header_data_hash(&header, &buf[48..]) {
+                                        // print out buf[48..] to see if it's the same as the sender's
+                                        // let hash1 = header.calculate_header_data_hash(&buf[48..]);
+                                        // let hash2 = header.hash_value;
 
+                                        // eprintln!("hash1: {:?}, hash2: {:?}", hash1, hash2);
+                                        // eprintln!("24 receiver hash value not match");
+                                        continue;
+                                    }
+                                }
+
+                                // For out-of-order packets, it checks if the sequence number has been seen before.
                                 if header.sequence_number != self.ack_num {
                                     if !self.seen.contains(&header.sequence_number) {
                                         self.seen.insert(header.sequence_number);
-                                        self.cache.insert(header.sequence_number, read_to_string(&buf[16..]));
+                                        self.cache.insert(header.sequence_number, read_to_string(&buf[48..]));
                                     }
                                     self.send_ack("", 0b0001_0000);
                                 } else {
@@ -202,11 +224,12 @@ impl Receiver {
                                         break;
                                     }
 
+                                    // Marks the packet's sequence number as seen.
                                     self.seen.insert(header.sequence_number);
-                                    let mut data = read_to_string(&buf[16..]);
-                                    let cached_date = self.check_cache(safe_increment(self.ack_num, data.len() as u32));
+                                    let mut data = read_to_string(&buf[48..]);
+                                    let cached_data = self.check_cache(safe_increment(self.ack_num, data.len() as u32));
 
-                                    data.push_str(&cached_date);
+                                    data.push_str(&cached_data);
                                     self.file.push_str(&data);
                                     self.send_ack(&data, 0b0001_0000);
                                 }
@@ -219,34 +242,38 @@ impl Receiver {
                     }
                     self.status = Status::Finished;
                     eprintln!("file length: {}", self.file.len());
-                    // dbg!(&self.cache);
                 }
+                // Finished
                 Status::Finished => {
                     self.send_ack("1", 0b0000_0001);
                     sleep(Duration::from_millis(100));
-
-                    // eprintln!("Finished");
-                    // dbg!(&self.file);
-                    // break;
                 }
             }
         }
         Ok(())
     }
 
-    fn find_packet_index(in_flight: &VecDeque<Packet>, ack_num: u32) -> Result<usize, ()> {
-        for (ind, packet) in in_flight.iter().enumerate() {
-            if packet.confirm_ack == ack_num {
-                return Ok(ind);
-            }
-        }
-        Err(())
+    // Helper function to check if the hash value of the header matches the hash value in the header
+    fn check_hash(header: &TcpHeader) -> bool {
+        let hash = header.calculate_header_hash();
+        hash == header.hash_value
     }
 
+    // Helper function to check if the hash value of the header and data matches the hash value in the header
+    fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
+        eprintln!("receiver header: {:?}", header);
+        // Delete the empty space at the end of the array
+        let d2 = read_to_string(data);
+        let hash = header.calculate_header_data_hash(d2.as_bytes());
+        hash == header.hash_value
+    }
+
+    // Put out-of-order packets into a cache
     fn register_cache(&mut self, ack_num: u32, data: String) {
         self.cache.insert(ack_num, data);
     }
 
+    // Retrieve and concatenate data from a cache based on sequential packet sequence numbers.
     fn check_cache(&mut self, mut seq_num: u32) -> String {
         let mut data = String::new();
 
@@ -258,22 +285,27 @@ impl Receiver {
 
         data
     }
-
+    // Send ACK back to the sender
     fn send_ack(&mut self, data: &str, flags: u8) {
         if flags != 1 {
             self.ack_num = safe_increment(self.ack_num, data.len() as u32);
         }
         
-        let header = TcpHeader {
+        let mut header = TcpHeader {
             source_port: self.local_port,
             destination_port: self.remote_port,
             sequence_number: self.seq_num,
             ack_number: self.ack_num,
             header_length: 4,
             flags,
-            window_size: self.wnd_size
+            window_size: self.wnd_size,
+            hash_value: [0; 32].into(), // testing
         };
 
+        // Get the hash value of the header
+        header.hash_value = header.calculate_header_hash();
+        // Print out hash
+        eprintln!("receiver hash: {:?}", header.hash_value);
         let mut bytes = header.as_bytes();
         // bytes.push(47);
 
@@ -281,65 +313,7 @@ impl Receiver {
         self.seq_num = safe_increment(self.seq_num, 1);
     }
 
-    fn register_packet(&mut self, header: TcpHeader, data: &str) {
-        let mut packet_data: Vec<u8> = Vec::new();
-        let seq_num = header.sequence_number;
-        let ack_num = header.ack_number;
-
-        for d in header.as_bytes() {
-            packet_data.push(d);
-        }
-
-        let mut data_len: u16 = 0;
-        for d in data.as_bytes() {
-            packet_data.push(*d);
-            data_len += 1;
-        }
-
-        if data_len == 0 {
-            data_len = 1;
-        }
-
-        let packet = Packet {
-            timestamp: Instant::now(),
-            data: packet_data.clone(),
-            seq_num,
-            ack_num,
-            confirm_ack: safe_increment(seq_num, data_len as u32),
-            data_len,
-        };
-
-        self.in_flight.push_back(packet);
-
-        Self::send_data(
-            &self.remote_host,
-            &self.remote_port,
-            packet_data.as_slice(),
-            &self.socket,
-        );
-
-        self.seq_num = safe_increment(seq_num, data_len as u32);
-    }
-
-    fn check_retransmission(&mut self) {
-        for packet in self.in_flight.iter_mut() {
-            let instant = Instant::now();
-            let duration = instant.duration_since(packet.timestamp.clone());
-
-            if duration >= Duration::from_millis(self.rto) {
-                Self::send_data(
-                    &self.remote_host,
-                    &self.remote_port,
-                    packet.data.as_slice(),
-                    &self.socket,
-                );
-                packet.timestamp = Instant::now();
-            } else {
-                return;
-            }
-        }
-    }
-
+    // Helper function to send data to the sender
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
             match socket.send_to(packet_data, format!("{}:{}", remote_host, remote_port)) {
