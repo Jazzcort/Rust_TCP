@@ -168,10 +168,10 @@ impl Sender {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
-                                    eprintln!("hash mismatch");
+                                    // eprintln!("hash mismatch");
                                     // check the tcp header
-                                    eprintln!("header: {:?}", header);
-                                    eprintln!("sender hash: {:?}", header.hash_value);
+                                    // eprintln!("header: {:?}", header);
+                                    // eprintln!("sender hash: {:?}", header.hash_value);
                                     continue;
                                 }
 
@@ -258,7 +258,7 @@ impl Sender {
                                     if self.cwnd > self.ssthresh {
                                         // self.cwnd += 2;
                                         self.update_cwnd(self.cwnd + 2);
-                                        eprintln!("greater than ssthresh");
+                                        // eprintln!("greater than ssthresh");
                                     } else {
                                         // self.cwnd = self.cwnd << 1; // slow start
                                         self.update_cwnd(self.cwnd << 1);
@@ -281,7 +281,7 @@ impl Sender {
                                                     let rtt = cur_time
                                                         .duration_since(packet.timestamp)
                                                         .as_millis();
-                                                    eprintln!("rtt: {}ms", rtt);
+                                                    // eprintln!("rtt: {}ms", rtt);
                                                     self.update_rto(rtt);
                                                 }
                                             }
@@ -304,12 +304,12 @@ impl Sender {
 
                                 // self.cur_wnd = self.cwnd * 1440;
 
-                                eprintln!("cwnd: {}", self.cwnd);
-                                eprintln!("cur_wnd: {}", self.cur_wnd);
-                                eprintln!("cur_buf: {}", self.cur_buf);
-                                eprintln!("pre_ack: {}", self.pre_ack);
-                                eprintln!("in flight: {}", self.in_flight.len());
-                                eprintln!("ssthresh: {}", self.ssthresh);
+                                // eprintln!("cwnd: {}", self.cwnd);
+                                // eprintln!("cur_wnd: {}", self.cur_wnd);
+                                // eprintln!("cur_buf: {}", self.cur_buf);
+                                // eprintln!("pre_ack: {}", self.pre_ack);
+                                // eprintln!("in flight: {}", self.in_flight.len());
+                                // eprintln!("ssthresh: {}", self.ssthresh);
 
                                 buf.fill(0);
                             }
@@ -493,12 +493,12 @@ impl Sender {
                     &self.socket,
                 );
                 packet.timestamp = Instant::now();
-                eprintln!(
-                    "resent: {}, since last sent: {}, ret: {}",
-                    packet.confirm_ack,
-                    duration.as_millis(),
-                    self.rto
-                );
+                // eprintln!(
+                //     "resent: {}, since last sent: {}, ret: {}",
+                //     packet.confirm_ack,
+                //     duration.as_millis(),
+                //     self.rto
+                // );
 
                 if is_first {
                     self.ssthresh = self.cwnd / 2;

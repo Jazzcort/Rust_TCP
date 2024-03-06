@@ -4,7 +4,6 @@ move: compile
 
 compile: client
 	cd receiver && ~/.cargo/bin/cargo build --release
-	cd ..
 	cd sender && ~/.cargo/bin/cargo build --release
 
 # Thanks for Luke Jianu
