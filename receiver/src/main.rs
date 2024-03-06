@@ -12,11 +12,9 @@ use std::collections::hash_map::DefaultHasher;
 
 
 fn main() {
-
+    // Get the receiver ready
     let mut receiver = Receiver::new("127.0.0.1".to_string()).unwrap();
-
+    // Start the receiver
     receiver.start();
-
-
 
 }

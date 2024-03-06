@@ -15,6 +15,7 @@ pub struct TcpHeader {
     pub hash_value: GenericArray<u8, U32>, // 32 bytes of hash value
 }
 
+// Implement the TCP header
 impl TcpHeader {
     // Create a new TCP header
     pub fn new(header_bytes: &[u8]) -> Self {

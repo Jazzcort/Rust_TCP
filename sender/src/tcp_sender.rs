@@ -24,6 +24,7 @@ enum Status {
     Finished, // After sending 
 }
 
+// Packet struct
 #[derive(Clone, Debug)]
 struct Packet {
     timestamp: Instant, // time when packet is sent
@@ -34,6 +35,7 @@ struct Packet {
     data_len: u16, // length for data
 }
 
+// Sender struct
 #[derive(Debug)]
 pub struct Sender {
     remote_host: String,
@@ -59,6 +61,7 @@ pub struct Sender {
 }
 
 impl Sender {
+    // Constructor
     pub fn new(remote_host: String, remote_port: u16, local_host: String) -> Result<Self, String> {
         // Generate a random sequence number
         let mut rng = rand::thread_rng();
@@ -100,11 +103,13 @@ impl Sender {
         })
     }
 
+    // Start the sender
     pub fn start(&mut self) -> Result<(), String> {
         loop {
             eprintln!("seq# {}, ack# {}", self.seq_num, self.ack_num);
 
             match self.status {
+                // Read from stdin
                 Status::StandBy => {
                     // Read from stdin
                     eprintln!("Standby");
@@ -124,6 +129,7 @@ impl Sender {
                     eprintln!("data length: {}", self.data.len());
                     self.status = Status::Handshake;
                 }
+                // Handshake
                 Status::Handshake => {
                     eprintln!("Handshake");
                     let mut header = TcpHeader {
@@ -156,8 +162,6 @@ impl Sender {
                                     eprintln!("hash mismatch");
                                     // check the tcp header
                                     eprintln!("header: {:?}", header);
-
-
                                     eprintln!("sender hash: {:?}", header.hash_value);
                                     continue;
                                 }
@@ -200,6 +204,7 @@ impl Sender {
                         self.check_retransmission();
                     }
                 }
+                // Sending data
                 Status::Sending => {
                     eprintln!("Sending");
                     while !self.in_flight.is_empty() || !self.data.is_empty() {
@@ -310,6 +315,7 @@ impl Sender {
                     }
                     self.status = Status::Finished; 
                 }
+                // After sending all data, send last packet to tell receiver that it's finished
                 Status::Finished => {
                     eprintln!("Finished");
 
@@ -471,7 +477,7 @@ impl Sender {
             }
         }
     }
-
+    // Helper function to send data
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
             match socket.send_to(packet_data, format!("{}:{}", remote_host, remote_port)) {

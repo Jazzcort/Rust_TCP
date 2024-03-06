@@ -13,6 +13,7 @@ use typenum::U32;
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
+// Receiver state
 #[derive(Debug)]
 enum Status {
     StandBy, // Waiting for the first packet from sender (handshake)
@@ -21,6 +22,7 @@ enum Status {
     Finished,
 }
 
+// Packet struct
 #[derive(Clone, Debug)]
 struct Packet {
     timestamp: Instant,
@@ -31,6 +33,7 @@ struct Packet {
     data_len: u16,
 }
 
+// Receiver struct
 #[derive(Debug)]
 pub struct Receiver {
     remote_host: String,
@@ -55,6 +58,7 @@ pub struct Receiver {
 }
 
 impl Receiver {
+    // Constructor
     pub fn new(local_host: String) -> Result<Self, String> {
         let mut rng = rand::thread_rng();
         let seq_num: u32 = rng.gen();
@@ -92,10 +96,11 @@ impl Receiver {
             seen: HashSet::new()
         })
     }
-
+    // Start the receiver
     pub fn start(&mut self) -> Result<(), String> {
         loop {
             match self.status {
+                // Get the SYN packet from the sender
                 Status::StandBy => {
                     eprintln!("Standby");
                     let mut buf: [u8; 1500] = [0; 1500];
@@ -108,9 +113,6 @@ impl Receiver {
                                 if !Self::check_hash(&header) {
                                     continue;
                                 }
-
-
-
                                 if header.flags != 2 {
                                     continue;
                                 }
@@ -134,6 +136,7 @@ impl Receiver {
 
                     self.status = Status::Handshake;
                 }
+                // Get the ACK packet from the sender
                 Status::Handshake => {
                     eprintln!("Handshake");
                     let mut buf: [u8; 1500] = [0; 1500];
@@ -168,6 +171,7 @@ impl Receiver {
 
                     self.status = Status::Sending;
                 }
+                // Get the data packet from the sender and send ACK back
                 Status::Sending => {
                     eprintln!("Sending");
                     loop {
@@ -239,6 +243,7 @@ impl Receiver {
                     self.status = Status::Finished;
                     eprintln!("file length: {}", self.file.len());
                 }
+                // Finished
                 Status::Finished => {
                     self.send_ack("1", 0b0000_0001);
                     sleep(Duration::from_millis(100));
@@ -263,7 +268,7 @@ impl Receiver {
         hash == header.hash_value
     }
 
-
+    // Put out-of-order packets into a cache
     fn register_cache(&mut self, ack_num: u32, data: String) {
         self.cache.insert(ack_num, data);
     }
@@ -280,7 +285,7 @@ impl Receiver {
 
         data
     }
-
+    // Send ACK back to the sender
     fn send_ack(&mut self, data: &str, flags: u8) {
         if flags != 1 {
             self.ack_num = safe_increment(self.ack_num, data.len() as u32);
@@ -308,7 +313,7 @@ impl Receiver {
         self.seq_num = safe_increment(self.seq_num, 1);
     }
 
-
+    // Helper function to send data to the sender
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
         loop {
             match socket.send_to(packet_data, format!("{}:{}", remote_host, remote_port)) {

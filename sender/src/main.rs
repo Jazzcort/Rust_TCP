@@ -9,10 +9,7 @@ use util::tcp_header::TcpHeader;
 use util::util::*;
 use tcp_sender::Sender;
 
-// use sha2::{Sha256, Digest};
-// use generic_array::GenericArray;
-// use typenum::U32;
-
+// Command line arguments
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None)]
 struct Cli {
@@ -22,16 +19,13 @@ struct Cli {
 
 
 fn main() -> Result<(), String> {
+    // Parse command line arguments
     let cli = Cli::parse();
-
     let port = cli.recv_port.parse::<u16>().unwrap();
-
+    // Get the sender ready
     let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string()).unwrap();
-
+    // Start the sender
     sender.start();
-
-
-    
 
     Ok(())
 }
