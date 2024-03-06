@@ -106,7 +106,6 @@ impl Receiver {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
-
                                     continue;
                                 }
 
@@ -197,8 +196,11 @@ impl Receiver {
                                     // Check if the hash value of the header and data matches the hash value in the header
                                     if !Self::check_header_data_hash(&header, &buf[48..]) {
                                         // print out buf[48..] to see if it's the same as the sender's
+                                        // let hash1 = header.calculate_header_data_hash(&buf[48..]);
+                                        // let hash2 = header.hash_value;
 
-                                        eprintln!("24 receiver hash value not match");
+                                        // eprintln!("hash1: {:?}, hash2: {:?}", hash1, hash2);
+                                        // eprintln!("24 receiver hash value not match");
                                         continue;
                                     }
                                 }
@@ -255,7 +257,9 @@ impl Receiver {
     // Helper function to check if the hash value of the header and data matches the hash value in the header
     fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
         eprintln!("receiver header: {:?}", header);
-        let hash = header.calculate_header_data_hash(data);
+        // Delete the empty space at the end of the array
+        let d2 = read_to_string(data);
+        let hash = header.calculate_header_data_hash(d2.as_bytes());
         hash == header.hash_value
     }
 
