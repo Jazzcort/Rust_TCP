@@ -261,16 +261,10 @@ impl Receiver {
 
     // Helper function to check if the hash value of the header and data matches the hash value in the header
     fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
-        eprintln!("receiver header: {:?}", header);
         // Delete the empty space at the end of the array
         let d2 = read_to_string(data);
         let hash = header.calculate_header_data_hash(d2.as_bytes());
         hash == header.hash_value
-    }
-
-    // Put out-of-order packets into a cache
-    fn register_cache(&mut self, ack_num: u32, data: String) {
-        self.cache.insert(ack_num, data);
     }
 
     // Retrieve and concatenate data from a cache based on sequential packet sequence numbers.
@@ -304,10 +298,7 @@ impl Receiver {
 
         // Get the hash value of the header
         header.hash_value = header.calculate_header_hash();
-        // Print out hash
-        eprintln!("receiver hash: {:?}", header.hash_value);
-        let mut bytes = header.as_bytes();
-        // bytes.push(47);
+        let bytes = header.as_bytes();
 
         Self::send_data(&self.remote_host, &self.remote_port, &bytes, &self.socket);
         self.seq_num = safe_increment(self.seq_num, 1);
