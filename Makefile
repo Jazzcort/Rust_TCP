@@ -1,10 +1,10 @@
-move: complie
+move: compile
 	mv ./receiver/target/release/receiver ./4700recv
 	mv ./sender/target/release/sender ./4700send
 
-complie: client
-	cd receiver && ~/.cargo/bin/cargo build -r
-	cd ../sender && ~/.cargo/bin/cargo build -r
+compile: client
+	cd receiver && ~/.cargo/bin/cargo build --release
+	cd ../sender && ~/.cargo/bin/cargo build --release
 
 # Thanks for Luke Jianu
 client: 
