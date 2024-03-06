@@ -1,4 +1,4 @@
-# Project 4: Reliable Transport Protocol Implementation README
+# Project 4: Reliable Transport Protocol 
 
 ## High-Level Approach
 Our team set out to create a reliable way to send data over UDP, inspired by how well TCP works but made to handle unreliable networks better. We aimed to make sure that all data gets from one point to another correctly, in the right order, and without missing any pieces, without using the automatic help that TCP offers. We started with a basic approach where we sent one piece of data at a time and waited for a response before sending the next. From there, we gradually added more complex features. These included the ability to send multiple pieces of data at once, the option to send data again if it didn't arrive the first time, and ways to adjust our timing based on how fast or slow the network was responding.
