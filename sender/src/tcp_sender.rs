@@ -238,8 +238,10 @@ impl Sender {
                                 else {
                                     self.count = 0;
 
-                                    if self.cur_wnd > self.ssthresh {
-                                        self.cwnd += 1; // congestion avoidance
+                                    if self.cwnd > self.ssthresh {
+                                        self.cwnd += 2;
+                                        eprintln!("greater than ssthresh");
+
                                     } else {
                                         self.cwnd = self.cwnd << 1; // slow start
                                     }
@@ -258,6 +260,7 @@ impl Sender {
                                 eprintln!("cur_buf: {}", self.cur_buf);
                                 eprintln!("pre_ack: {}", self.pre_ack);
                                 eprintln!("in flight: {}", self.in_flight.len());
+                                eprintln!("ssthresh: {}", self.ssthresh);
 
                                 // Based on the acknowledgment number in the received packet, pop the packet in the in_flight queue.
                                 match Self::find_packet_index(&self.in_flight, header.ack_number) {
@@ -288,6 +291,7 @@ impl Sender {
                             }
                             Err(_) => {}
                         }
+
 
                         // Send data if there is enough space in sliding window
                         while !self.data.is_empty()
@@ -446,11 +450,12 @@ impl Sender {
     // Manage the retransmission of packets that have not been acknowledged within a certain timeout period.
     fn check_retransmission(&mut self) {
         let mut num = self.cwnd;
+        let mut cnt: u16 = 0;
 
         // Iterates over the packets currently in flight (sent but not yet acknowledged) with mutable access. 
         for packet in self.in_flight.iter_mut() {
             if num == 0 {
-                return;
+                break;
             }
 
             let instant = Instant::now();
@@ -471,11 +476,26 @@ impl Sender {
                     duration.as_millis(),
                     self.rto
                 );
-                num -= 1; 
+
+                if num == self.cwnd {
+                    self.ssthresh = self.cwnd / 2;
+                }
+
+                num -= 1;
+                cnt += 1;
+
+                if cnt == self.ssthresh {
+                    break;
+                }
+
             } else {
-                return;
+                break;
             }
         }
+
+        // if num != self.cwnd {
+        //     self.cwnd = 2;
+        // }
     }
     // Helper function to send data
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
