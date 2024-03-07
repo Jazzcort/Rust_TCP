@@ -15,7 +15,7 @@ use typenum::U32;
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
-const DATASIZE: u16 = 1440;
+const DATASIZE: u16 = 1452;
 
 // Sender status
 #[derive(Debug)]
@@ -415,7 +415,7 @@ impl Sender {
         } else if self.rtt > 900 {
             self.rtt = 900;
         }
-        self.rto = self.rtt * 3 / 2;
+        self.rto = self.rtt * 9 / 5;
     }
 
     // Find the index of the packet with the given ack number
@@ -540,6 +540,6 @@ impl Sender {
         }
 
         self.cwnd = new_value;
-        self.cur_wnd = new_value * 1440;
+        self.cur_wnd = new_value * DATASIZE;
     }
 }
