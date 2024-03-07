@@ -518,9 +518,9 @@ impl Sender {
                 break;
             }
         }
-        // if !is_first {
-        //     self.cwnd = 2;
-        // }
+        if !is_first {
+            self.update_cwnd(self.cwnd / 2);
+        }
     }
     // Helper function to send data
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
