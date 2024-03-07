@@ -252,6 +252,10 @@ impl Sender {
                                         );
                                         self.update_cwnd(self.cwnd / 2);
                                         self.count = 0;
+
+                                        // let cur_time = Instant::now();
+                                        // let rtt = cur_time.duration_since(self.in_flight[0].timestamp).as_millis();
+                                        // self.update_rto(rtt);
                                     }
                                 }
                                 // if not duplicate ack
@@ -259,11 +263,8 @@ impl Sender {
                                     self.count = 0;
 
                                     if self.cwnd > self.ssthresh {
-                                        // self.cwnd += 2;
                                         self.update_cwnd(self.cwnd + 2);
-                                        eprintln!("greater than ssthresh");
                                     } else {
-                                        // self.cwnd = self.cwnd << 1; // slow start
                                         self.update_cwnd(self.cwnd << 1);
                                     }
 
@@ -305,14 +306,6 @@ impl Sender {
                                     self.ack_num =
                                         safe_increment(self.ack_num, fragment.len() as u32);
                                 }
-
-                                // if self.cwnd >= 42 {
-                                //     self.cwnd = 42;
-                                // } else if self.cwnd < 2 {
-                                //     self.cwnd = 2;
-                                // }
-
-                                // self.cur_wnd = self.cwnd * 1440;
 
                                 eprintln!("cwnd: {}", self.cwnd);
                                 eprintln!("cur_wnd: {}", self.cur_wnd);
@@ -420,8 +413,8 @@ impl Sender {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 5 {
             self.rtt = 5;
-        } else if self.rtt > 2000 {
-            self.rtt = 2000;
+        } else if self.rtt > 1200 {
+            self.rtt = 1200;
         }
         self.rto = self.rtt * 2;
     }
@@ -544,8 +537,8 @@ impl Sender {
     }
 
     fn update_cwnd(&mut self, mut new_value: u16) {
-        if new_value >= 42 {
-            new_value = 42;
+        if new_value >= 45 {
+            new_value = 45;
         } else if new_value < 2 {
             new_value = 2;
         }
