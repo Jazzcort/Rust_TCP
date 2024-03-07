@@ -189,7 +189,10 @@ impl Sender {
                                 // Set sshtresh to adv_wnd / 1440
                                 self.ssthresh = adv_wnd / DATASIZE;
                                 self.cur_wnd = self.cwnd * DATASIZE;
-                                self.in_flight.pop_front();
+                                let packet = self.in_flight.pop_front().unwrap();
+                                let cur_time = Instant::now();
+                                self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
+                                self.update_rto(self.rtt as u128);
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
                                 let mut header = TcpHeader {
@@ -247,7 +250,6 @@ impl Sender {
                                             self.in_flight[0].data.as_slice(),
                                             &self.socket,
                                         );
-                                        // self.cwnd = self.cwnd / 2;
                                         self.update_cwnd(self.cwnd / 2);
                                         self.count = 0;
                                     }
@@ -271,22 +273,29 @@ impl Sender {
                                         header.ack_number,
                                     ) {
                                         Ok(ind) => {
+                                            let cur_time = Instant::now();
+                                            let mut rtt = 0;
                                             // oops through and removes all packets up to and including the packet that was acknowledged.
                                             for i in 0..=ind {
                                                 let packet = self.in_flight.pop_front().unwrap();
                                                 self.cur_buf -= packet.data_len;
 
+                                                rtt += cur_time.duration_since(packet.timestamp).as_millis();
+
                                                 // Calculate RTT
-                                                if i == ind {
-                                                    let cur_time = Instant::now();
-                                                    let rtt = cur_time
-                                                        .duration_since(packet.timestamp)
-                                                        .as_millis();
-                                                    eprintln!("rtt: {}ms", rtt);
-                                                    self.update_rto(rtt);
-                                                }
+                                                // if i == ind {
+                                                //     let cur_time = Instant::now();
+                                                //     let rtt = cur_time
+                                                //         .duration_since(packet.timestamp)
+                                                //         .as_millis();
+                                                //     eprintln!("rtt: {}ms", rtt);
+                                                //     self.update_rto(rtt);
+                                                // }
                                             }
                                             // Updates pre_ack to the acknowledgment number from the received packet.
+                                            rtt = rtt / (ind as u128 + 1);
+                                            eprintln!("rtt: {}ms", rtt);
+                                            self.update_rto(rtt);
                                             self.pre_ack = header.ack_number;
                                         }
                                         Err(_) => {}
@@ -516,6 +525,9 @@ impl Sender {
                 break;
             }
         }
+        // if !is_first {
+        //     self.cwnd = 2;
+        // }
     }
     // Helper function to send data
     fn send_data(remote_host: &str, remote_port: &u16, packet_data: &[u8], socket: &UdpSocket) {
