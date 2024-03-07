@@ -15,7 +15,7 @@ use typenum::U32;
 use crate::util::tcp_header::TcpHeader;
 use crate::{read_to_string, safe_increment};
 
-const DATASIZE: u16 = 1440;
+const DATASIZE: u16 = 1452;
 
 // Sender status
 #[derive(Debug)]
@@ -411,8 +411,8 @@ impl Sender {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 5 {
             self.rtt = 5;
-        } else if self.rtt > 900 {
-            self.rtt = 900;
+        } else if self.rtt > 2000 {
+            self.rtt = 2000;
         }
         self.rto = self.rtt * 2;
     }
