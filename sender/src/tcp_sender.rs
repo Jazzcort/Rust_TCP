@@ -519,7 +519,7 @@ impl Sender {
             }
         }
         if !is_first {
-            self.update_cwnd(self.cwnd / 2);
+            self.update_cwnd(self.cwnd * 3 / 4);
         }
     }
     // Helper function to send data
