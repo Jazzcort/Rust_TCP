@@ -16,7 +16,8 @@ pub fn safe_increment(cur_seq: u32, add_bytes: u32) -> u32 {
     // Overflow
     if dst_to_wrap < add_bytes {
         add_bytes - dst_to_wrap
-    } // No overflow 
+    }
+    // No overflow
     else {
         cur_seq + add_bytes
     }

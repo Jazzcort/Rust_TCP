@@ -1,5 +1,5 @@
-use sha2::{Sha256, Digest};
 use generic_array::GenericArray;
+use sha2::{Digest, Sha256};
 use typenum::U32;
 
 // TCP header struct, total 16 bytes
@@ -51,8 +51,8 @@ impl TcpHeader {
         hasher.update(data);
         let result = hasher.finalize();
         result
-    }   
-    
+    }
+
     // Function to calculate the hash value of the header
     pub fn calculate_header_hash(&self) -> GenericArray<u8, U32> {
         let mut hasher = Sha256::new();
@@ -87,11 +87,11 @@ impl TcpHeader {
         res.push(u8::from_str_radix(&ack_num_str[8..16], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[16..24], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[24..], 2).unwrap());
-        
+
         // Get the header length as a byte and push it to the result
         let head_len_str = format!("{:08b}", self.header_length << 4);
         res.push(u8::from_str_radix(&head_len_str[..], 2).unwrap());
-        
+
         // Get the flags as a byte and push it to the result
         let flag_str = format!("{:08b}", self.flags);
         res.push(u8::from_str_radix(&flag_str[..], 2).unwrap());
@@ -103,7 +103,6 @@ impl TcpHeader {
 
         res
     }
-    
 
     // Convert the header to a byte array
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -131,11 +130,11 @@ impl TcpHeader {
         res.push(u8::from_str_radix(&ack_num_str[8..16], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[16..24], 2).unwrap());
         res.push(u8::from_str_radix(&ack_num_str[24..], 2).unwrap());
-        
+
         // Get the header length as a byte and push it to the result
         let head_len_str = format!("{:08b}", self.header_length << 4);
         res.push(u8::from_str_radix(&head_len_str[..], 2).unwrap());
-        
+
         // Get the flags as a byte and push it to the result
         let flag_str = format!("{:08b}", self.flags);
         res.push(u8::from_str_radix(&flag_str[..], 2).unwrap());

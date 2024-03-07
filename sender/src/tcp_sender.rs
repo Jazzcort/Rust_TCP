@@ -189,10 +189,7 @@ impl Sender {
                                 // Set sshtresh to adv_wnd / 1440
                                 self.ssthresh = adv_wnd / DATASIZE;
                                 self.cur_wnd = self.cwnd * DATASIZE;
-                                let packet = self.in_flight.pop_front().unwrap();
-                                let cur_time = Instant::now();
-                                self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
-                                self.update_rto(self.rtt as u128);
+                                self.in_flight.pop_front();
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
                                 let mut header = TcpHeader {
@@ -250,12 +247,9 @@ impl Sender {
                                             self.in_flight[0].data.as_slice(),
                                             &self.socket,
                                         );
+                                        // self.cwnd = self.cwnd / 2;
                                         self.update_cwnd(self.cwnd / 2);
                                         self.count = 0;
-
-                                        // let cur_time = Instant::now();
-                                        // let rtt = cur_time.duration_since(self.in_flight[0].timestamp).as_millis();
-                                        // self.update_rto(rtt);
                                     }
                                 }
                                 // if not duplicate ack
@@ -263,8 +257,11 @@ impl Sender {
                                     self.count = 0;
 
                                     if self.cwnd > self.ssthresh {
+                                        // self.cwnd += 2;
                                         self.update_cwnd(self.cwnd + 2);
+                                        eprintln!("greater than ssthresh");
                                     } else {
+                                        // self.cwnd = self.cwnd << 1; // slow start
                                         self.update_cwnd(self.cwnd << 1);
                                     }
 
@@ -274,29 +271,22 @@ impl Sender {
                                         header.ack_number,
                                     ) {
                                         Ok(ind) => {
-                                            let cur_time = Instant::now();
-                                            let mut rtt = 0;
                                             // oops through and removes all packets up to and including the packet that was acknowledged.
                                             for i in 0..=ind {
                                                 let packet = self.in_flight.pop_front().unwrap();
                                                 self.cur_buf -= packet.data_len;
 
-                                                rtt += cur_time.duration_since(packet.timestamp).as_millis();
-
                                                 // Calculate RTT
-                                                // if i == ind {
-                                                //     let cur_time = Instant::now();
-                                                //     let rtt = cur_time
-                                                //         .duration_since(packet.timestamp)
-                                                //         .as_millis();
-                                                //     eprintln!("rtt: {}ms", rtt);
-                                                //     self.update_rto(rtt);
-                                                // }
+                                                if i == ind {
+                                                    let cur_time = Instant::now();
+                                                    let rtt = cur_time
+                                                        .duration_since(packet.timestamp)
+                                                        .as_millis();
+                                                    eprintln!("rtt: {}ms", rtt);
+                                                    self.update_rto(rtt);
+                                                }
                                             }
                                             // Updates pre_ack to the acknowledgment number from the received packet.
-                                            rtt = rtt / (ind as u128 + 1);
-                                            eprintln!("rtt: {}ms", rtt);
-                                            self.update_rto(rtt);
                                             self.pre_ack = header.ack_number;
                                         }
                                         Err(_) => {}
@@ -306,6 +296,14 @@ impl Sender {
                                     self.ack_num =
                                         safe_increment(self.ack_num, fragment.len() as u32);
                                 }
+
+                                // if self.cwnd >= 42 {
+                                //     self.cwnd = 42;
+                                // } else if self.cwnd < 2 {
+                                //     self.cwnd = 2;
+                                // }
+
+                                // self.cur_wnd = self.cwnd * 1440;
 
                                 eprintln!("cwnd: {}", self.cwnd);
                                 eprintln!("cur_wnd: {}", self.cur_wnd);
@@ -413,8 +411,8 @@ impl Sender {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 5 {
             self.rtt = 5;
-        } else if self.rtt > 1200 {
-            self.rtt = 1200;
+        } else if self.rtt > 900 {
+            self.rtt = 900;
         }
         self.rto = self.rtt * 2;
     }
@@ -504,7 +502,7 @@ impl Sender {
                 );
 
                 if is_first {
-                    self.ssthresh = self.cwnd * 2 / 3;
+                    self.ssthresh = self.cwnd / 2;
                     is_first = false;
                 }
 
@@ -517,9 +515,6 @@ impl Sender {
             } else {
                 break;
             }
-        }
-        if !is_first {
-            self.update_cwnd(self.cwnd * 3 / 4);
         }
     }
     // Helper function to send data
@@ -537,8 +532,8 @@ impl Sender {
     }
 
     fn update_cwnd(&mut self, mut new_value: u16) {
-        if new_value >= 45 {
-            new_value = 45;
+        if new_value >= 42 {
+            new_value = 42;
         } else if new_value < 2 {
             new_value = 2;
         }
