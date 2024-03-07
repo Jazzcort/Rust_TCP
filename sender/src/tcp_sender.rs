@@ -130,6 +130,8 @@ impl Sender {
                         .map_err(|e| format!("{e} -> Failed to read stdin"))?;
                     eprintln!("{}", buffer.len());
 
+                    eprintln!("data: {}", buffer);
+
                     self.data = buffer
                         .as_bytes() // convert string to bytes
                         .chunks(DATASIZE as usize) // split into chunks of 1440 bytes and return an iterator
@@ -413,7 +415,7 @@ impl Sender {
         } else if self.rtt > 900 {
             self.rtt = 900;
         }
-        self.rto = self.rtt * 2;
+        self.rto = self.rtt * 3 / 2;
     }
 
     // Find the index of the packet with the given ack number
