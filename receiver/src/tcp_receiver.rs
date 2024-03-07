@@ -246,7 +246,7 @@ impl Receiver {
                 // Finished
                 Status::Finished => {
                     self.send_ack("1", 0b0000_0001);
-                    sleep(Duration::from_millis(100));
+                    sleep(Duration::from_millis(20));
                 }
             }
         }
