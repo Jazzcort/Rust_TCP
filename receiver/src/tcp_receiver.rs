@@ -1,6 +1,6 @@
 use rand::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::net::UdpSocket;
 use std::time::Duration;
 use std::time::Instant;
@@ -219,7 +219,7 @@ impl Receiver {
                                 } else {
 
                                     if header.flags == 1 {
-                                        print!("{}", &self.file);
+                                        // print!("{}", &self.file);
                                         self.send_ack("1", 0b0001_0001);
                                         break;
                                     }
@@ -231,6 +231,8 @@ impl Receiver {
 
                                     data.push_str(&cached_data);
                                     self.file.push_str(&data);
+                                    print!("{}", data);
+                                    io::stdout().flush();
                                     self.send_ack(&data, 0b0001_0000);
                                 }
 

@@ -130,6 +130,7 @@ impl Sender {
                         .map_err(|e| format!("{e} -> Failed to read stdin"))?;
                     eprintln!("{}", buffer.len());
 
+
                     self.data = buffer
                         .as_bytes() // convert string to bytes
                         .chunks(DATASIZE as usize) // split into chunks of 1440 bytes and return an iterator
@@ -346,41 +347,41 @@ impl Sender {
                 // After sending all data, send last packet to tell receiver that it's finished
                 Status::Finished => {
                     eprintln!("Finished");
+                    // sleep(Duration::from_millis(100));
+                    // let mut header = TcpHeader {
+                    //     source_port: self.local_port,
+                    //     destination_port: self.remote_port,
+                    //     sequence_number: self.seq_num,
+                    //     ack_number: self.ack_num,
+                    //     header_length: 4,
+                    //     flags: 0b0000_0001,
+                    //     window_size: self.wnd_size,
+                    //     hash_value: [0; 32].into(), // testing
+                    // };
 
-                    let mut header = TcpHeader {
-                        source_port: self.local_port,
-                        destination_port: self.remote_port,
-                        sequence_number: self.seq_num,
-                        ack_number: self.ack_num,
-                        header_length: 4,
-                        flags: 0b0000_0001,
-                        window_size: self.wnd_size,
-                        hash_value: [0; 32].into(), // testing
-                    };
+                    // // Get the hash value of the header
+                    // header.hash_value = header.calculate_header_hash();
 
-                    // Get the hash value of the header
-                    header.hash_value = header.calculate_header_hash();
+                    // self.register_packet(header, "");
 
-                    self.register_packet(header, "");
+                    // let mut buf: [u8; 1500] = [0; 1500];
+                    // loop {
+                    //     self.check_retransmission(); // Check if it's RTO
+                    //     match self.socket.recv(&mut buf) {
+                    //         Ok(_) => {
+                    //             let header = TcpHeader::new(&buf[..48]);
+                    //             // Check if the hash value of the header matches the hash value in the header
+                    //             if !Self::check_hash(&header) {
+                    //                 continue;
+                    //             }
 
-                    let mut buf: [u8; 1500] = [0; 1500];
-                    loop {
-                        self.check_retransmission(); // Check if it's RTO
-                        match self.socket.recv(&mut buf) {
-                            Ok(_) => {
-                                let header = TcpHeader::new(&buf[..48]);
-                                // Check if the hash value of the header matches the hash value in the header
-                                if !Self::check_hash(&header) {
-                                    continue;
-                                }
-
-                                if header.ack_number == self.in_flight[0].confirm_ack {
-                                    break;
-                                }
-                            }
-                            Err(_) => {}
-                        }
-                    }
+                    //             if header.ack_number == self.in_flight[0].confirm_ack {
+                    //                 break;
+                    //             }
+                    //         }
+                    //         Err(_) => {}
+                    //     }
+                    // }
                     eprintln!("rto: {}ms", self.rto);
                     // Self::send_data(&self.remote_host, &self.remote_port, &header.as_bytes(), &self.socket);
 
@@ -538,6 +539,6 @@ impl Sender {
         }
 
         self.cwnd = new_value;
-        self.cur_wnd = new_value * 1440;
+        self.cur_wnd = new_value * DATASIZE;
     }
 }
