@@ -189,7 +189,10 @@ impl Sender {
                                 // Set sshtresh to adv_wnd / 1440
                                 self.ssthresh = adv_wnd / DATASIZE;
                                 self.cur_wnd = self.cwnd * DATASIZE;
-                                self.in_flight.pop_front();
+                                let packet = self.in_flight.pop_front().unwrap();
+                                let cur_time = Instant::now();
+                                self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
+                                self.update_rto(self.rtt as u128);
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
                                 let mut header = TcpHeader {
