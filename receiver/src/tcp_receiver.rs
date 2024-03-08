@@ -72,7 +72,7 @@ impl Receiver {
             .set_nonblocking(true)
             .map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
 
-        eprintln!("Bound to port {}", socket.local_addr().unwrap().port());
+        eprint!("Bound to port {}", socket.local_addr().unwrap().port());
         io::stderr().flush();
 
         Ok(Receiver {
