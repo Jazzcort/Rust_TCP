@@ -15,6 +15,6 @@ fn main() {
     // Get the receiver ready
     let mut receiver = Receiver::new("127.0.0.1".to_string()).unwrap();
     // Start the receiver
-    receiver.start();
+    receiver.start().expect("Failed to start the receiver");
 
 }

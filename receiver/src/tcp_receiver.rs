@@ -1,6 +1,6 @@
 use rand::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::net::UdpSocket;
 use std::time::Duration;
 use std::time::Instant;
@@ -18,8 +18,7 @@ use crate::{read_to_string, safe_increment};
 enum Status {
     StandBy, // Waiting for the first packet from sender (handshake)
     Handshake,
-    Sending,
-    Finished,
+    Sending
 }
 
 // Packet struct
@@ -72,7 +71,8 @@ impl Receiver {
             .set_nonblocking(true)
             .map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
 
-        eprintln!("Bound to port {}", socket.local_addr().unwrap().port());
+        eprint!("Bound to port {}", socket.local_addr().unwrap().port());
+        io::stderr().flush();
 
         Ok(Receiver {
             remote_host: "".to_string(),
@@ -88,8 +88,8 @@ impl Receiver {
             socket,
             rto: 1000,
             in_flight: VecDeque::new(),
-            wnd_size: 46720,
-            cur_wnd: 46720,
+            wnd_size: 65340,
+            cur_wnd: 65340,
             file: String::new(),
             cur_buf: 0,
             cache: HashMap::new(),
@@ -182,13 +182,12 @@ impl Receiver {
                                 let header = TcpHeader::new(&buf[..48]);
                                 
                                 // ACK + PSH, ACK, FIN
-                                if header.flags != 24 && header.flags != 16 && header.flags != 1 {
+                                if header.flags != 24 && header.flags != 16 {
                                     continue;
                                 }
                                 
                                 // If it's ACK from the handshake
                                 if header.flags == 16 {
-
                                     // Check if the hash value of the header matches the hash value in the header
                                     if !Self::check_hash(&header) {
                                         continue;
@@ -199,12 +198,6 @@ impl Receiver {
                                 if header.flags == 24 {
                                     // Check if the hash value of the header and data matches the hash value in the header
                                     if !Self::check_header_data_hash(&header, &buf[48..]) {
-                                        // print out buf[48..] to see if it's the same as the sender's
-                                        // let hash1 = header.calculate_header_data_hash(&buf[48..]);
-                                        // let hash2 = header.hash_value;
-
-                                        // eprintln!("hash1: {:?}, hash2: {:?}", hash1, hash2);
-                                        // eprintln!("24 receiver hash value not match");
                                         continue;
                                     }
                                 }
@@ -217,12 +210,11 @@ impl Receiver {
                                     }
                                     self.send_ack("", 0b0001_0000);
                                 } else {
-
-                                    if header.flags == 1 {
-                                        print!("{}", &self.file);
-                                        self.send_ack("1", 0b0001_0001);
-                                        break;
-                                    }
+                                    // if header.flags == 1 {
+                                    //     // print!("{}", &self.file);
+                                    //     self.send_ack("1", 0b0001_0001);
+                                    //     break;
+                                    // }
 
                                     // Marks the packet's sequence number as seen.
                                     self.seen.insert(header.sequence_number);
@@ -231,6 +223,8 @@ impl Receiver {
 
                                     data.push_str(&cached_data);
                                     self.file.push_str(&data);
+                                    print!("{}", data);
+                                    io::stdout().flush();
                                     self.send_ack(&data, 0b0001_0000);
                                 }
 
@@ -240,13 +234,6 @@ impl Receiver {
                         }
 
                     }
-                    self.status = Status::Finished;
-                    eprintln!("file length: {}", self.file.len());
-                }
-                // Finished
-                Status::Finished => {
-                    self.send_ack("1", 0b0000_0001);
-                    sleep(Duration::from_millis(100));
                 }
             }
         }
@@ -261,16 +248,10 @@ impl Receiver {
 
     // Helper function to check if the hash value of the header and data matches the hash value in the header
     fn check_header_data_hash(header: &TcpHeader, data: &[u8]) -> bool {
-        eprintln!("receiver header: {:?}", header);
         // Delete the empty space at the end of the array
         let d2 = read_to_string(data);
         let hash = header.calculate_header_data_hash(d2.as_bytes());
         hash == header.hash_value
-    }
-
-    // Put out-of-order packets into a cache
-    fn register_cache(&mut self, ack_num: u32, data: String) {
-        self.cache.insert(ack_num, data);
     }
 
     // Retrieve and concatenate data from a cache based on sequential packet sequence numbers.
@@ -278,9 +259,9 @@ impl Receiver {
         let mut data = String::new();
 
         while self.cache.contains_key(&seq_num) {
-            let tmp = self.cache.get(&seq_num).unwrap();
+            let tmp = self.cache.remove(&seq_num).unwrap();
             seq_num += tmp.len() as u32;
-            data.push_str(tmp);
+            data.push_str(&tmp);
         }
 
         data
@@ -304,10 +285,7 @@ impl Receiver {
 
         // Get the hash value of the header
         header.hash_value = header.calculate_header_hash();
-        // Print out hash
-        eprintln!("receiver hash: {:?}", header.hash_value);
-        let mut bytes = header.as_bytes();
-        // bytes.push(47);
+        let bytes = header.as_bytes();
 
         Self::send_data(&self.remote_host, &self.remote_port, &bytes, &self.socket);
         self.seq_num = safe_increment(self.seq_num, 1);
