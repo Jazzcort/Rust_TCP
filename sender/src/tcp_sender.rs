@@ -416,7 +416,7 @@ impl Sender {
         } else if self.rtt > 1200 {
             self.rtt = 1200;
         }
-        self.rto = self.rtt * 9 / 5;
+        self.rto = self.rtt * 19 / 10;
     }
 
     // Find the index of the packet with the given ack number
