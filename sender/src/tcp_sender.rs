@@ -190,9 +190,9 @@ impl Sender {
                                 self.ssthresh = adv_wnd / DATASIZE;
                                 self.cur_wnd = self.cwnd * DATASIZE;
                                 let packet = self.in_flight.pop_front().unwrap();
-                                let cur_time = Instant::now();
-                                self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
-                                self.update_rto(self.rtt as u128);
+                                // let cur_time = Instant::now();
+                                // self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
+                                // self.update_rto(self.rtt as u128);
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
                                 let mut header = TcpHeader {
@@ -414,8 +414,8 @@ impl Sender {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
         if self.rtt < 5 {
             self.rtt = 5;
-        } else if self.rtt > 900 {
-            self.rtt = 900;
+        } else if self.rtt > 1300 {
+            self.rtt = 1300;
         }
         self.rto = self.rtt * 2;
     }
@@ -535,8 +535,8 @@ impl Sender {
     }
 
     fn update_cwnd(&mut self, mut new_value: u16) {
-        if new_value >= 42 {
-            new_value = 42;
+        if new_value >= 45 {
+            new_value = 45;
         } else if new_value < 2 {
             new_value = 2;
         }
