@@ -23,7 +23,7 @@ fn main() -> Result<(), String> {
     let cli = Cli::parse();
     let port = cli.recv_port.parse::<u16>().unwrap();
     // Get the sender ready
-    let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string(), 600, 46464, 4).unwrap();
+    let mut sender = Sender::new(cli.recv_host, port, "127.0.0.1".to_string(), 600, 65340, 4).unwrap();
     // Start the sender
     sender.start().expect("Failed to start the sender");
 

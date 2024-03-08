@@ -73,6 +73,7 @@ impl Receiver {
             .map_err(|e| format!("{e} -> Failed to switch to non-blocking mode"))?;
 
         eprintln!("Bound to port {}", socket.local_addr().unwrap().port());
+        io::stderr().flush();
 
         Ok(Receiver {
             remote_host: "".to_string(),
@@ -88,8 +89,8 @@ impl Receiver {
             socket,
             rto: 1000,
             in_flight: VecDeque::new(),
-            wnd_size: 46720,
-            cur_wnd: 46720,
+            wnd_size: 65340,
+            cur_wnd: 65340,
             file: String::new(),
             cur_buf: 0,
             cache: HashMap::new(),

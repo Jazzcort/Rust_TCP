@@ -169,10 +169,10 @@ impl Sender {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
-                                    eprintln!("hash mismatch");
+                                    // eprintln!("hash mismatch");
                                     // check the tcp header
-                                    eprintln!("header: {:?}", header);
-                                    eprintln!("sender hash: {:?}", header.hash_value);
+                                    // eprintln!("header: {:?}", header);
+                                    // eprintln!("sender hash: {:?}", header.hash_value);
                                     continue;
                                 }
 
@@ -416,7 +416,7 @@ impl Sender {
         } else if self.rtt > 1200 {
             self.rtt = 1200;
         }
-        self.rto = self.rtt * 2;
+        self.rto = self.rtt * 9 / 5;
     }
 
     // Find the index of the packet with the given ack number
