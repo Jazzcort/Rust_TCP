@@ -18,8 +18,7 @@ use crate::{read_to_string, safe_increment};
 enum Status {
     StandBy, // Waiting for the first packet from sender (handshake)
     Handshake,
-    Sending,
-    Finished,
+    Sending
 }
 
 // Packet struct
@@ -183,13 +182,12 @@ impl Receiver {
                                 let header = TcpHeader::new(&buf[..48]);
                                 
                                 // ACK + PSH, ACK, FIN
-                                if header.flags != 24 && header.flags != 16 && header.flags != 1 {
+                                if header.flags != 24 && header.flags != 16 {
                                     continue;
                                 }
                                 
                                 // If it's ACK from the handshake
                                 if header.flags == 16 {
-
                                     // Check if the hash value of the header matches the hash value in the header
                                     if !Self::check_hash(&header) {
                                         continue;
@@ -200,12 +198,6 @@ impl Receiver {
                                 if header.flags == 24 {
                                     // Check if the hash value of the header and data matches the hash value in the header
                                     if !Self::check_header_data_hash(&header, &buf[48..]) {
-                                        // print out buf[48..] to see if it's the same as the sender's
-                                        // let hash1 = header.calculate_header_data_hash(&buf[48..]);
-                                        // let hash2 = header.hash_value;
-
-                                        // eprintln!("hash1: {:?}, hash2: {:?}", hash1, hash2);
-                                        // eprintln!("24 receiver hash value not match");
                                         continue;
                                     }
                                 }
@@ -218,12 +210,11 @@ impl Receiver {
                                     }
                                     self.send_ack("", 0b0001_0000);
                                 } else {
-
-                                    if header.flags == 1 {
-                                        // print!("{}", &self.file);
-                                        self.send_ack("1", 0b0001_0001);
-                                        break;
-                                    }
+                                    // if header.flags == 1 {
+                                    //     // print!("{}", &self.file);
+                                    //     self.send_ack("1", 0b0001_0001);
+                                    //     break;
+                                    // }
 
                                     // Marks the packet's sequence number as seen.
                                     self.seen.insert(header.sequence_number);
@@ -243,13 +234,6 @@ impl Receiver {
                         }
 
                     }
-                    self.status = Status::Finished;
-                    eprintln!("file length: {}", self.file.len());
-                }
-                // Finished
-                Status::Finished => {
-                    self.send_ack("1", 0b0000_0001);
-                    sleep(Duration::from_millis(30));
                 }
             }
         }
@@ -275,9 +259,9 @@ impl Receiver {
         let mut data = String::new();
 
         while self.cache.contains_key(&seq_num) {
-            let tmp = self.cache.get(&seq_num).unwrap();
+            let tmp = self.cache.remove(&seq_num).unwrap();
             seq_num += tmp.len() as u32;
-            data.push_str(tmp);
+            data.push_str(&tmp);
         }
 
         data

@@ -68,7 +68,6 @@ impl Sender {
         remote_host: String,
         remote_port: u16,
         local_host: String,
-        default_rto: u64,
         default_wnd_size: u16,
         default_cwnd: u16,
     ) -> Result<Self, String> {
@@ -99,13 +98,13 @@ impl Sender {
             ack_num: 0,
             data: VecDeque::new(),
             socket,
-            rto: default_rto, // Initial RTO
+            rto: 800, // Initial RTO
             rtt: 400,         // Initial RTT
             in_flight: VecDeque::new(),
             wnd_size: default_wnd_size,
             ssthresh: 32,
             count: 0,
-            cur_wnd: 5760,
+            cur_wnd: 5808,
             cwnd: default_cwnd,
             cur_buf: 1,
             pre_ack: 0,
@@ -169,10 +168,6 @@ impl Sender {
 
                                 // Check if the hash value of the header matches the hash value in the header
                                 if !Self::check_hash(&header) {
-                                    // eprintln!("hash mismatch");
-                                    // check the tcp header
-                                    // eprintln!("header: {:?}", header);
-                                    // eprintln!("sender hash: {:?}", header.hash_value);
                                     continue;
                                 }
 
@@ -191,6 +186,7 @@ impl Sender {
                                 self.cur_wnd = self.cwnd * DATASIZE;
                                 let packet = self.in_flight.pop_front().unwrap();
                                 let cur_time = Instant::now();
+                                // Calculate the initial rtt
                                 self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
                                 self.update_rto(self.rtt as u128);
                                 self.ack_num = safe_increment(header.sequence_number, 1);
@@ -252,10 +248,6 @@ impl Sender {
                                         );
                                         self.update_cwnd(self.cwnd / 2);
                                         self.count = 0;
-
-                                        // let cur_time = Instant::now();
-                                        // let rtt = cur_time.duration_since(self.in_flight[0].timestamp).as_millis();
-                                        // self.update_rto(rtt);
                                     }
                                 }
                                 // if not duplicate ack
@@ -280,23 +272,14 @@ impl Sender {
                                             for i in 0..=ind {
                                                 let packet = self.in_flight.pop_front().unwrap();
                                                 self.cur_buf -= packet.data_len;
-
                                                 rtt += cur_time.duration_since(packet.timestamp).as_millis();
-
-                                                // Calculate RTT
-                                                // if i == ind {
-                                                //     let cur_time = Instant::now();
-                                                //     let rtt = cur_time
-                                                //         .duration_since(packet.timestamp)
-                                                //         .as_millis();
-                                                //     eprintln!("rtt: {}ms", rtt);
-                                                //     self.update_rto(rtt);
-                                                // }
                                             }
-                                            // Updates pre_ack to the acknowledgment number from the received packet.
+                                            
+                                            // Calculate the average rtt
                                             rtt = rtt / (ind as u128 + 1);
                                             eprintln!("rtt: {}ms", rtt);
                                             self.update_rto(rtt);
+                                            // Updates pre_ack to the acknowledgment number from the received packet.
                                             self.pre_ack = header.ack_number;
                                         }
                                         Err(_) => {}
@@ -349,50 +332,11 @@ impl Sender {
                 // After sending all data, send last packet to tell receiver that it's finished
                 Status::Finished => {
                     eprintln!("Finished");
-                    // sleep(Duration::from_millis(100));
-                    // let mut header = TcpHeader {
-                    //     source_port: self.local_port,
-                    //     destination_port: self.remote_port,
-                    //     sequence_number: self.seq_num,
-                    //     ack_number: self.ack_num,
-                    //     header_length: 4,
-                    //     flags: 0b0000_0001,
-                    //     window_size: self.wnd_size,
-                    //     hash_value: [0; 32].into(), // testing
-                    // };
-
-                    // // Get the hash value of the header
-                    // header.hash_value = header.calculate_header_hash();
-
-                    // self.register_packet(header, "");
-
-                    // let mut buf: [u8; 1500] = [0; 1500];
-                    // loop {
-                    //     self.check_retransmission(); // Check if it's RTO
-                    //     match self.socket.recv(&mut buf) {
-                    //         Ok(_) => {
-                    //             let header = TcpHeader::new(&buf[..48]);
-                    //             // Check if the hash value of the header matches the hash value in the header
-                    //             if !Self::check_hash(&header) {
-                    //                 continue;
-                    //             }
-
-                    //             if header.ack_number == self.in_flight[0].confirm_ack {
-                    //                 break;
-                    //             }
-                    //         }
-                    //         Err(_) => {}
-                    //     }
-                    // }
                     eprintln!("rto: {}ms", self.rto);
-                    // Self::send_data(&self.remote_host, &self.remote_port, &header.as_bytes(), &self.socket);
-
                     break;
                 }
             }
         }
-
-        // sleep(Duration::from_millis(800));
         Ok(())
     }
 
@@ -411,11 +355,13 @@ impl Sender {
     // Update RTO using RTT
     fn update_rto(&mut self, rtt: u128) {
         self.rtt = (self.rtt * 85 / 100) + (rtt * 15 / 100) as u64;
+        // Upper and lower bound of the rtt
         if self.rtt < 5 {
             self.rtt = 5;
         } else if self.rtt > 1200 {
             self.rtt = 1200;
         }
+        // Calculate rto more aggressively
         self.rto = self.rtt * 9 / 5;
     }
 
@@ -475,16 +421,13 @@ impl Sender {
 
     // Manage the retransmission of packets that have not been acknowledged within a certain timeout period.
     fn check_retransmission(&mut self) {
-        // let mut num = self.cwnd;
         let mut is_first = true;
+        // Keep track of the number of the packets being re-transmitted
         let mut cnt: u16 = 0;
 
         // Iterates over the packets currently in flight (sent but not yet acknowledged) with mutable access.
         for packet in self.in_flight.iter_mut() {
-            // if num == 0 {
-            //     break;
-            // }
-
+            // Current time
             let instant = Instant::now();
             let duration = instant.duration_since(packet.timestamp.clone());
 
@@ -518,6 +461,7 @@ impl Sender {
                 break;
             }
         }
+        // Reduce cwnd while retransmission happens
         if !is_first {
             self.update_cwnd(self.cwnd * 3 / 4);
         }
@@ -537,6 +481,7 @@ impl Sender {
     }
 
     fn update_cwnd(&mut self, mut new_value: u16) {
+        // Upper and lower bound of cwnd
         if new_value >= 45 {
             new_value = 45;
         } else if new_value < 2 {
