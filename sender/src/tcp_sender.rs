@@ -448,7 +448,7 @@ impl Sender {
                 );
 
                 if is_first {
-                    self.ssthresh = self.cwnd * 2 / 3;
+                    self.ssthresh = self.cwnd / 2;
                     is_first = false;
                 }
 
