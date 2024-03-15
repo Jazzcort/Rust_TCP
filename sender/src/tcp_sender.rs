@@ -255,7 +255,7 @@ impl Sender {
                                     self.count = 0;
 
                                     if self.cwnd > self.ssthresh {
-                                        self.update_cwnd(self.cwnd + 2);
+                                        self.update_cwnd(self.cwnd + 1);
                                     } else {
                                         self.update_cwnd(self.cwnd << 1);
                                     }
@@ -362,7 +362,7 @@ impl Sender {
             self.rtt = 1200;
         }
         // Calculate rto more aggressively
-        self.rto = self.rtt * 9 / 5;
+        self.rto = self.rtt * 2;
     }
 
     // Find the index of the packet with the given ack number
@@ -447,7 +447,7 @@ impl Sender {
                 );
 
                 if is_first {
-                    self.ssthresh = self.cwnd * 2 / 3;
+                    self.ssthresh = self.cwnd / 2;
                     is_first = false;
                 }
 
@@ -463,7 +463,7 @@ impl Sender {
         }
         // Reduce cwnd while retransmission happens
         if !is_first {
-            self.update_cwnd(self.cwnd * 5 / 8);
+            self.update_cwnd(2);
         }
     }
     // Helper function to send data
@@ -482,8 +482,8 @@ impl Sender {
 
     fn update_cwnd(&mut self, mut new_value: u16) {
         // Upper and lower bound of cwnd
-        if new_value >= 45 {
-            new_value = 45;
+        if new_value >= 44 {
+            new_value = 44;
         } else if new_value < 2 {
             new_value = 2;
         }
