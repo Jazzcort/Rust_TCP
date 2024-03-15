@@ -246,8 +246,7 @@ impl Sender {
                                             self.in_flight[0].data.as_slice(),
                                             &self.socket,
                                         );
-                                        self.in_flight.get_mut(0).unwrap().timestamp = Instant::now();
-                                        self.update_cwnd(self.cwnd * 2 / 3);
+                                        self.update_cwnd(self.cwnd / 2);
                                         self.count = 0;
                                     }
                                 }
@@ -464,7 +463,7 @@ impl Sender {
         }
         // Reduce cwnd while retransmission happens
         if !is_first {
-            self.update_cwnd(self.cwnd * 3 / 4);
+            self.update_cwnd(self.cwnd * 5 / 8);
         }
     }
     // Helper function to send data
