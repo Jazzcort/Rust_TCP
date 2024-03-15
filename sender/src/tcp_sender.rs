@@ -246,7 +246,7 @@ impl Sender {
                                             self.in_flight[0].data.as_slice(),
                                             &self.socket,
                                         );
-                                        self.update_cwnd(self.cwnd / 2);
+                                        self.update_cwnd(self.cwnd * 2 / 3);
                                         self.count = 0;
                                     }
                                 }
