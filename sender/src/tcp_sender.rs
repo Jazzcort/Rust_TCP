@@ -463,7 +463,7 @@ impl Sender {
         }
         // Reduce cwnd while retransmission happens
         if !is_first {
-            self.update_cwnd(self.cwnd * 3 / 4);
+            self.update_cwnd(self.cwnd * 5 / 8);
         }
     }
     // Helper function to send data
