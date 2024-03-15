@@ -99,7 +99,7 @@ impl Sender {
             data: VecDeque::new(),
             socket,
             rto: 800, // Initial RTO
-            rtt: 400,         // Initial RTT
+            rtt: 400, // Initial RTT
             in_flight: VecDeque::new(),
             wnd_size: default_wnd_size,
             ssthresh: 32,
@@ -128,7 +128,6 @@ impl Sender {
                         .read_line(&mut buffer)
                         .map_err(|e| format!("{e} -> Failed to read stdin"))?;
                     eprintln!("{}", buffer.len());
-
 
                     self.data = buffer
                         .as_bytes() // convert string to bytes
@@ -187,7 +186,8 @@ impl Sender {
                                 let packet = self.in_flight.pop_front().unwrap();
                                 let cur_time = Instant::now();
                                 // Calculate the initial rtt
-                                self.rtt = cur_time.duration_since(packet.timestamp).as_millis() as u64;
+                                self.rtt =
+                                    cur_time.duration_since(packet.timestamp).as_millis() as u64;
                                 self.update_rto(self.rtt as u128);
                                 self.ack_num = safe_increment(header.sequence_number, 1);
                                 // After handshake, send data
@@ -255,7 +255,7 @@ impl Sender {
                                     self.count = 0;
 
                                     if self.cwnd > self.ssthresh {
-                                        self.update_cwnd(self.cwnd + 1);
+                                        self.update_cwnd(self.cwnd + 2);
                                     } else {
                                         self.update_cwnd(self.cwnd << 1);
                                     }
@@ -272,9 +272,11 @@ impl Sender {
                                             for i in 0..=ind {
                                                 let packet = self.in_flight.pop_front().unwrap();
                                                 self.cur_buf -= packet.data_len;
-                                                rtt += cur_time.duration_since(packet.timestamp).as_millis();
+                                                rtt += cur_time
+                                                    .duration_since(packet.timestamp)
+                                                    .as_millis();
                                             }
-                                            
+
                                             // Calculate the average rtt
                                             rtt = rtt / (ind as u128 + 1);
                                             eprintln!("rtt: {}ms", rtt);
@@ -362,7 +364,7 @@ impl Sender {
             self.rtt = 1200;
         }
         // Calculate rto more aggressively
-        self.rto = self.rtt * 2;
+        self.rto = self.rtt * 9 / 5;
     }
 
     // Find the index of the packet with the given ack number
@@ -447,23 +449,22 @@ impl Sender {
                 );
 
                 if is_first {
-                    self.ssthresh = self.cwnd / 2;
+                    self.ssthresh = self.cwnd * 2 / 3;
                     is_first = false;
                 }
 
                 // num -= 1;
                 cnt += 1;
+            }
 
-                if cnt == self.ssthresh {
-                    break;
-                }
-            } else {
+            if cnt >= self.ssthresh {
+                eprintln!("cnt: {}", cnt);
                 break;
             }
         }
         // Reduce cwnd while retransmission happens
         if !is_first {
-            self.update_cwnd(2);
+            self.update_cwnd(self.cwnd * 5 / 8);
         }
     }
     // Helper function to send data
