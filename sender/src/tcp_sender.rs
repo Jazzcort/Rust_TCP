@@ -482,8 +482,8 @@ impl Sender {
 
     fn update_cwnd(&mut self, mut new_value: u16) {
         // Upper and lower bound of cwnd
-        if new_value >= 45 {
-            new_value = 45;
+        if new_value >= 44 {
+            new_value = 44;
         } else if new_value < 2 {
             new_value = 2;
         }
