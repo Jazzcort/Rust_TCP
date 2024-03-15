@@ -247,7 +247,7 @@ impl Sender {
                                             &self.socket,
                                         );
                                         self.in_flight.get_mut(0).unwrap().timestamp = Instant::now();
-                                        self.update_cwnd(self.cwnd / 2);
+                                        self.update_cwnd(self.cwnd * 2 / 3);
                                         self.count = 0;
                                     }
                                 }
